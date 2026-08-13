@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Profile - CampusShare</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <nav class="navbar">
+            <div class="nav-brand">
+                <h1>CampusShare</h1>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="btn btn-outline">Home</a>
+            </div>
+        </nav>
+
+        <main class="auth-main">
+            <div class="auth-card auth-card-large">
+                <h2>Complete Your Profile</h2>
+                <p class="auth-subtitle">Please provide your academic information</p>
+                
+                <form id="completeProfileForm" class="auth-form">
+                    <div class="form-group">
+                        <label for="name">Full Name</label>
+                        <input type="text" id="name" name="name" required placeholder="John Doe">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="studentId">Student ID</label>
+                        <input type="text" id="studentId" name="studentId" required placeholder="STU12345">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="department">Department</label>
+                        <select id="department" name="department" required>
+                            <option value="">Select Department</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Mechanical">Mechanical</option>
+                            <option value="Civil">Civil</option>
+                            <option value="Electrical">Electrical</option>
+                            <option value="Information Technology">Information Technology</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="year">Year</label>
+                        <select id="year" name="year" required>
+                            <option value="">Select Year</option>
+                            <option value="1">1st Year</option>
+                            <option value="2">2nd Year</option>
+                            <option value="3">3rd Year</option>
+                            <option value="4">4th Year</option>
+                            <option value="5">5th Year</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-full">Complete Profile</button>
+                    
+                    <div id="profileError" class="error-message"></div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        // Handle profile completion
+        async function handleProfileCompletion(event) {
+            event.preventDefault();
+            
+            if (!window.supabaseClient) {
+                alert('Supabase client not initialized. Please refresh the page.');
+                return;
+            }
+            
+            const name = document.getElementById('name').value;
+            const studentId = document.getElementById('studentId').value;
+            const department = document.getElementById('department').value;
+            const year = document.getElementById('year').value;
+            const errorDiv = document.getElementById('profileError');
+            
+            errorDiv.textContent = '';
+            
+            try {
+                // Get current user
+                const { data: { user }, error: userError } = await window.supabaseClient.auth.getUser();
+                
+                if (userError || !user) {
+                    throw new Error('User not authenticated');
+                }
+                
+                // Create or update profile
+                const { data: existingProfile } = await window.supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+                
+                if (existingProfile) {
+                    // Update existing profile
+                    const { error: updateError } = await window.supabaseClient
+                        .from('profiles')
+                        .update({
+                            name: name,
+                            student_id: studentId,
+                            department: department,
+                            year: year
+                        })
+                        .eq('id', user.id);
+                    
+                    if (updateError) throw updateError;
+                } else {
+                    // Create new profile
+                    const { error: insertError } = await window.supabaseClient
+                        .from('profiles')
+                        .insert([{
+                            id: user.id,
+                            name: name,
+                            email: user.email,
+                            student_id: studentId,
+                            department: department,
+                            year: year
+                        }]);
+                    
+                    if (insertError) throw insertError;
+                }
+                
+                // Redirect to dashboard
+                window.location.href = 'dashboard.html';
+                
+            } catch (error) {
+                console.error('Profile completion error:', error);
+                errorDiv.textContent = error.message || 'Failed to complete profile. Please try again.';
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('completeProfileForm');
+            if (form) {
+                form.addEventListener('submit', handleProfileCompletion);
+            }
+            
+            // Pre-fill name from Google OAuth if available
+            window.supabaseClient.auth.getUser().then(({ data: { user } }) => {
+                if (user && user.user_metadata && user.user_metadata.full_name) {
+                    document.getElementById('name').value = user.user_metadata.full_name;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

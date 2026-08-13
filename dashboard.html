@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - CampusShare</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="navbar navbar-app">
+            <div class="nav-brand">
+                <h1>CampusShare</h1>
+            </div>
+            <div class="nav-links">
+                <a href="marketplace.html" class="nav-link">Marketplace</a>
+                <a href="seller-requests.html" class="nav-link">Seller Requests</a>
+                <a href="my-requests.html" class="nav-link">My Requests</a>
+                <a href="planner.html" class="nav-link">Smart Planner</a>
+                <a href="history.html" class="nav-link">History</a>
+                <a href="profile.html" class="nav-link">Profile</a>
+                <button id="logoutBtn" class="btn btn-outline">Logout</button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="dashboard-header">
+                <h2 id="welcomeMessage">Welcome, Student!</h2>
+                <p class="dashboard-subtitle">Manage your academic resources</p>
+            </div>
+
+            <div class="quick-actions">
+                <a href="marketplace.html" class="action-card">
+                    <div class="action-icon">📚</div>
+                    <h3>Browse Resources</h3>
+                    <p>Find textbooks, calculators, and more</p>
+                </a>
+                <a href="create-listing.html" class="action-card">
+                    <div class="action-icon">➕</div>
+                    <h3>Add Resource</h3>
+                    <p>List your resources for others</p>
+                </a>
+                <a href="planner.html" class="action-card">
+                    <div class="action-icon">🤖</div>
+                    <h3>Smart Resource Planner</h3>
+                    <p>AI-powered resource combination finder</p>
+                </a>
+                <a href="history.html" class="action-card">
+                    <div class="action-icon">📋</div>
+                    <h3>Planner History</h3>
+                    <p>View your saved plans</p>
+                </a>
+            </div>
+
+            <div class="dashboard-stats">
+                <div class="stat-card">
+                    <h3 id="totalResources">0</h3>
+                    <p>Available Resources</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="myListings">0</h3>
+                    <p>My Listings</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="myPlans">0</h3>
+                    <p>Saved Plans</p>
+                </div>
+            </div>
+
+            <div class="recent-section">
+                <h3>Recent Resources</h3>
+                <div id="recentResources" class="resource-grid">
+                    <p class="loading-text">Loading...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/marketplace.js"></script>
+</body>
+</html>

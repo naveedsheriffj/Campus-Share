@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Listing - CampusShare</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="navbar navbar-app">
+            <div class="nav-brand">
+                <h1>CampusShare</h1>
+            </div>
+            <div class="nav-links">
+                <a href="dashboard.html" class="nav-link">Dashboard</a>
+                <a href="marketplace.html" class="nav-link">Marketplace</a>
+                <a href="seller-requests.html" class="nav-link">Seller Requests</a>
+                <a href="my-requests.html" class="nav-link">My Requests</a>
+                <a href="planner.html" class="nav-link">Smart Planner</a>
+                <a href="history.html" class="nav-link">History</a>
+                <a href="profile.html" class="nav-link">Profile</a>
+                <button id="logoutBtn" class="btn btn-outline">Logout</button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="back-nav">
+                <a href="marketplace.html" class="back-link">← Back to Marketplace</a>
+            </div>
+
+            <div class="form-container">
+                <h2 id="formTitle">Create New Listing</h2>
+                <p class="form-subtitle">List your academic resource for other students</p>
+                
+                <form id="listingForm" class="listing-form">
+                    <input type="hidden" id="listingId" name="listingId">
+                    
+                    <div class="form-group">
+                        <label for="title">Title *</label>
+                        <input type="text" id="title" name="title" required placeholder="e.g., DBMS Textbook">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="description">Description *</label>
+                        <textarea id="description" name="description" required rows="4" placeholder="Describe your resource..."></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="category">Category *</label>
+                            <select id="category" name="category" required>
+                                <option value="">Select Category</option>
+                                <option value="Textbook">Textbook</option>
+                                <option value="Calculator">Calculator</option>
+                                <option value="Lab Equipment">Lab Equipment</option>
+                                <option value="Drawing Tools">Drawing Tools</option>
+                                <option value="Arduino">Arduino</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Project Material">Project Material</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="subject">Subject</label>
+                            <input type="text" id="subject" name="subject" placeholder="e.g., Database Systems">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="listingType">Listing Type *</label>
+                            <select id="listingType" name="listingType" required>
+                                <option value="">Select Type</option>
+                                <option value="Sell">Sell</option>
+                                <option value="Rent">Rent</option>
+                                <option value="Exchange">Exchange</option>
+                                <option value="Donate">Donate</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="price">Price (₹) *</label>
+                            <input type="number" id="price" name="price" required min="0" placeholder="0">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="condition">Condition *</label>
+                            <select id="condition" name="condition" required>
+                                <option value="">Select Condition</option>
+                                <option value="New">New</option>
+                                <option value="Like New">Like New</option>
+                                <option value="Good">Good</option>
+                                <option value="Fair">Fair</option>
+                                <option value="Poor">Poor</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="availability">Availability *</label>
+                            <select id="availability" name="availability" required>
+                                <option value="Available">Available</option>
+                                <option value="Reserved">Reserved</option>
+                                <option value="Sold">Sold</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="pickupLocation">Pickup Location *</label>
+                        <input type="text" id="pickupLocation" name="pickupLocation" required placeholder="e.g., Library, Block A">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="image">Image</label>
+                        <input type="file" id="image" name="image" accept="image/*">
+                        <small class="form-hint">Upload an image of your resource</small>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="submitBtn">Create Listing</button>
+                        <a href="marketplace.html" class="btn btn-outline">Cancel</a>
+                    </div>
+                    
+                    <div id="listingError" class="error-message"></div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/listing.js"></script>
+</body>
+</html>

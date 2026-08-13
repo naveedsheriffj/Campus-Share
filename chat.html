@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - CampusShare</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="navbar navbar-app">
+            <div class="nav-brand">
+                <h1>CampusShare</h1>
+            </div>
+            <div class="nav-links">
+                <a href="dashboard.html" class="nav-link">Dashboard</a>
+                <a href="marketplace.html" class="nav-link">Marketplace</a>
+                <a href="seller-requests.html" class="nav-link">Seller Requests</a>
+                <a href="my-requests.html" class="nav-link">My Requests</a>
+                <a href="planner.html" class="nav-link">Smart Planner</a>
+                <a href="history.html" class="nav-link">History</a>
+                <a href="profile.html" class="nav-link">Profile</a>
+                <button id="logoutBtn" class="btn btn-outline">Logout</button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="chat-container">
+                <div class="chat-header" id="chatHeader">
+                    <h2>Chat</h2>
+                    <p class="chat-subtitle">Loading...</p>
+                </div>
+
+                <div class="chat-messages" id="messagesContainer">
+                    <p class="loading-text">Loading messages...</p>
+                </div>
+
+                <div class="chat-input-container">
+                    <form id="messageForm" class="chat-form">
+                        <input 
+                            type="text" 
+                            id="messageInput" 
+                            class="chat-input" 
+                            placeholder="Type your message..." 
+                            autocomplete="off"
+                        >
+                        <button type="submit" id="sendBtn" class="btn btn-primary">Send</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/chat.js"></script>
+</body>
+</html>

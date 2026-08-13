@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Details - CampusShare</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="navbar navbar-app">
+            <div class="nav-brand">
+                <h1>CampusShare</h1>
+            </div>
+            <div class="nav-links">
+                <a href="dashboard.html" class="nav-link">Dashboard</a>
+                <a href="marketplace.html" class="nav-link">Marketplace</a>
+                <a href="seller-requests.html" class="nav-link">Seller Requests</a>
+                <a href="my-requests.html" class="nav-link">My Requests</a>
+                <a href="planner.html" class="nav-link">Smart Planner</a>
+                <a href="history.html" class="nav-link">History</a>
+                <a href="profile.html" class="nav-link">Profile</a>
+                <button id="logoutBtn" class="btn btn-outline">Logout</button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="back-nav">
+                <a href="marketplace.html" class="back-link">← Back to Marketplace</a>
+            </div>
+
+            <div id="resourceDetails" class="resource-details">
+                <p class="loading-text">Loading resource details...</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Request Modal -->
+    <div id="requestModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Send Request</h3>
+                <button class="modal-close" onclick="closeRequestModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="requestForm">
+                    <div class="form-group">
+                        <label for="requestMessage">Message to Seller</label>
+                        <textarea 
+                            id="requestMessage" 
+                            class="form-control" 
+                            rows="4" 
+                            placeholder="Introduce yourself and mention when you'd like to pick up the item..."
+                            required
+                        ></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="requestPickup">Preferred Pickup Location</label>
+                        <input 
+                            type="text" 
+                            id="requestPickup" 
+                            class="form-control" 
+                            placeholder="e.g., Library entrance, Block A, etc."
+                            required
+                        >
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" onclick="closeRequestModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Send Request</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/marketplace.js"></script>
+    <script src="js/requests.js"></script>
+</body>
+</html>

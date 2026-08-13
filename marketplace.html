@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketplace - CampusShare</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="navbar navbar-app">
+            <div class="nav-brand">
+                <h1>CampusShare</h1>
+            </div>
+            <div class="nav-links">
+                <a href="dashboard.html" class="nav-link">Dashboard</a>
+                <a href="marketplace.html" class="nav-link active">Marketplace</a>
+                <a href="seller-requests.html" class="nav-link">Seller Requests</a>
+                <a href="my-requests.html" class="nav-link">My Requests</a>
+                <a href="planner.html" class="nav-link">Smart Planner</a>
+                <a href="history.html" class="nav-link">History</a>
+                <a href="profile.html" class="nav-link">Profile</a>
+                <button id="logoutBtn" class="btn btn-outline">Logout</button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="marketplace-header">
+                <h2>Resource Marketplace</h2>
+                <p class="marketplace-subtitle">Find academic resources from fellow students</p>
+            </div>
+
+            <div class="marketplace-controls">
+                <div class="search-bar">
+                    <input type="text" id="searchInput" placeholder="Search resources...">
+                    <button id="searchBtn" class="btn btn-primary">Search</button>
+                </div>
+                
+                <div class="filters">
+                    <select id="categoryFilter" class="filter-select">
+                        <option value="">All Categories</option>
+                        <option value="Textbook">Textbook</option>
+                        <option value="Calculator">Calculator</option>
+                        <option value="Lab Equipment">Lab Equipment</option>
+                        <option value="Drawing Tools">Drawing Tools</option>
+                        <option value="Arduino">Arduino</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Project Material">Project Material</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    
+                    <select id="typeFilter" class="filter-select">
+                        <option value="">All Types</option>
+                        <option value="Sell">Sell</option>
+                        <option value="Rent">Rent</option>
+                        <option value="Exchange">Exchange</option>
+                        <option value="Donate">Donate</option>
+                    </select>
+                    
+                    <select id="conditionFilter" class="filter-select">
+                        <option value="">All Conditions</option>
+                        <option value="New">New</option>
+                        <option value="Like New">Like New</option>
+                        <option value="Good">Good</option>
+                        <option value="Fair">Fair</option>
+                        <option value="Poor">Poor</option>
+                    </select>
+                    
+                    <button id="filterBtn" class="btn btn-secondary">Apply Filters</button>
+                    <button id="resetBtn" class="btn btn-outline">Reset</button>
+                </div>
+                
+                <a href="create-listing.html" class="btn btn-primary">Add Listing</a>
+            </div>
+
+            <div id="resourceGrid" class="resource-grid">
+                <p class="loading-text">Loading resources...</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/marketplace.js"></script>
+</body>
+</html>

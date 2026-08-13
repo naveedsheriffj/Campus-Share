@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - CampusShare</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="navbar navbar-app">
+            <div class="nav-brand">
+                <h1>CampusShare</h1>
+            </div>
+            <div class="nav-links">
+                <a href="dashboard.html" class="nav-link">Dashboard</a>
+                <a href="marketplace.html" class="nav-link">Marketplace</a>
+                <a href="seller-requests.html" class="nav-link">Seller Requests</a>
+                <a href="my-requests.html" class="nav-link">My Requests</a>
+                <a href="planner.html" class="nav-link">Smart Planner</a>
+                <a href="history.html" class="nav-link">History</a>
+                <a href="profile.html" class="nav-link active">Profile</a>
+                <button id="logoutBtn" class="btn btn-outline">Logout</button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <div class="profile-header">
+                <h2>My Profile</h2>
+                <p class="profile-subtitle">Manage your account information</p>
+            </div>
+
+            <div class="profile-sections">
+                <div class="profile-form-section">
+                    <h3>Profile Information</h3>
+                    <form id="profileForm" class="profile-form">
+                        <div class="form-group">
+                            <label for="profileName">Full Name</label>
+                            <input type="text" id="profileName" name="name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="profileEmail">Email</label>
+                            <input type="email" id="profileEmail" name="email" disabled>
+                            <small class="form-hint">Email cannot be changed</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="profileStudentId">Student ID</label>
+                            <input type="text" id="profileStudentId" name="studentId" required>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="profileDepartment">Department</label>
+                                <select id="profileDepartment" name="department" required>
+                                    <option value="">Select Department</option>
+                                    <option value="Computer Science">Computer Science</option>
+                                    <option value="Electronics">Electronics</option>
+                                    <option value="Mechanical">Mechanical</option>
+                                    <option value="Civil">Civil</option>
+                                    <option value="Electrical">Electrical</option>
+                                    <option value="Information Technology">Information Technology</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="profileYear">Year</label>
+                                <select id="profileYear" name="year" required>
+                                    <option value="">Select Year</option>
+                                    <option value="1">1st Year</option>
+                                    <option value="2">2nd Year</option>
+                                    <option value="3">3rd Year</option>
+                                    <option value="4">4th Year</option>
+                                    <option value="5">5th Year</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Update Profile</button>
+                        
+                        <div id="profileError" class="error-message"></div>
+                        <div id="profileSuccess" class="success-message"></div>
+                    </form>
+                </div>
+
+                <div class="profile-listings-section">
+                    <h3>My Listings</h3>
+                    <div id="myListings" class="resource-grid">
+                        <p class="loading-text">Loading your listings...</p>
+                    </div>
+                    <div id="noListings" class="empty-state" style="display: none;">
+                        <p>You haven't created any listings yet.</p>
+                        <a href="create-listing.html" class="btn btn-primary">Create Listing</a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/listing.js"></script>
+    <script src="js/profile.js"></script>
+</body>
+</html>
