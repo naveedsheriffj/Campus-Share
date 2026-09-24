@@ -58,12 +58,25 @@
                                 </select>
                             </div>
                         </div>
+
+                        <div class="form-group">
+                            <label for="algorithmMode">Unit-III Search & Inference Algorithm *</label>
+                            <select id="algorithmMode" name="algorithmMode" required>
+                                <option value="benchmark" selected>🔬 Benchmark Mode (Side-by-Side: Simple BT vs FC vs FC+MRV+LCV)</option>
+                                <option value="mrv">⚡ Forward Checking + MRV (Fail-First) + LCV (Optimized)</option>
+                                <option value="fc">🛡️ Forward Checking Only (Constraint Propagation)</option>
+                                <option value="simple">🔄 Simple Backtracking (Baseline Standard)</option>
+                            </select>
+                            <small class="form-hint">Compare search nodes, backtrack counts, and domain pruning across algorithms</small>
+                        </div>
                         
                         <button type="submit" class="btn btn-primary btn-large">Find Best Combination</button>
                     </form>
                 </div>
 
                 <div id="plannerResults" class="planner-results-section" style="display: none;">
+                    <div id="benchmarkDisplay" class="benchmark-container" style="display: none;"></div>
+
                     <div class="results-header">
                         <h3>Best Combination Found</h3>
                         <div class="algorithm-badge">Algorithm: CSP + Backtracking Search</div>

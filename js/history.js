@@ -58,7 +58,10 @@ function renderHistoryItem(history) {
     return `
         <div class="history-item">
             <div class="history-header-item">
-                <h3>Saved Plan</h3>
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                    <h3>Saved Plan</h3>
+                    ${history.algorithm_used ? `<span class="badge-optimal" style="font-size: 0.75rem;">${escapeHtml(history.algorithm_used)}</span>` : ''}
+                </div>
                 <span class="history-date">${date}</span>
             </div>
             <div class="history-resources">

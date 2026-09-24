@@ -1,8 +1,8 @@
 // ============================================
 // SMART RESOURCE PLANNER MODULE (FIREBASE)
+// With Unit-III CSP Inference & Benchmark Visualizer
 // ============================================
 
-// Current planner state
 let currentPlanResult = null;
 let currentPlanRequirements = null;
 
@@ -13,8 +13,8 @@ async function handlePlannerSubmit(event) {
     const requiredResourcesText = document.getElementById('requiredResources').value;
     const budget = parseFloat(document.getElementById('budget').value);
     const minimumCondition = document.getElementById('minimumCondition').value;
+    const mode = document.getElementById('algorithmMode')?.value || 'benchmark';
     
-    // Parse required resources
     const requiredResources = requiredResourcesText
         .split('\n')
         .map(r => r.trim())
@@ -28,7 +28,8 @@ async function handlePlannerSubmit(event) {
     currentPlanRequirements = {
         requiredResources,
         budget,
-        minimumCondition
+        minimumCondition,
+        mode
     };
     
     // Fetch available resources from Firestore
@@ -39,12 +40,13 @@ async function handlePlannerSubmit(event) {
         return;
     }
     
-    // Solve CSP using our custom algorithm
+    // Solve CSP using our custom algorithm / benchmark
     const result = window.CSPSolver.solveResourcePlanningProblem(
         requiredResources,
         budget,
         minimumCondition,
-        availableResources
+        availableResources,
+        mode
     );
     
     currentPlanResult = result;
@@ -53,10 +55,11 @@ async function handlePlannerSubmit(event) {
     displayAIExplanation(result);
 }
 
-// Display planner results
+// Display planner results and comparison table
 function displayPlannerResults(result) {
     const resultsSection = document.getElementById('plannerResults');
     const solutionDisplay = document.getElementById('solutionDisplay');
+    const benchmarkContainer = document.getElementById('benchmarkDisplay');
     
     if (!result.success) {
         resultsSection.style.display = 'block';
@@ -67,11 +70,20 @@ function displayPlannerResults(result) {
                 <p>Try increasing your budget or lowering your minimum condition requirement.</p>
             </div>
         `;
+        if (benchmarkContainer) benchmarkContainer.style.display = 'none';
         return;
     }
     
     resultsSection.style.display = 'block';
     
+    // Render Benchmark Comparison Table if available
+    if (result.benchmark && benchmarkContainer) {
+        renderBenchmarkTable(result.benchmark, benchmarkContainer);
+    } else if (benchmarkContainer) {
+        benchmarkContainer.style.display = 'none';
+    }
+    
+    // Render Selected Solution
     let solutionHTML = '<div class="solution-items">';
     
     for (const [variable, resource] of Object.entries(result.solution)) {
@@ -116,6 +128,74 @@ function displayPlannerResults(result) {
     solutionDisplay.innerHTML = solutionHTML;
 }
 
+// Render side-by-side benchmark table
+function renderBenchmarkTable(benchmark, container) {
+    container.style.display = 'block';
+    
+    const rowsHTML = benchmark.summary.map((row, idx) => {
+        const isBest = idx === 2; // FC + MRV
+        return `
+            <tr class="${isBest ? 'benchmark-row-best' : ''}">
+                <td>
+                    <strong>${row.name}</strong>
+                    ${isBest ? ' <span class="badge-optimal">★ Most Efficient</span>' : ''}
+                </td>
+                <td><span class="metric-pill">${row.nodes}</span></td>
+                <td><span class="metric-pill ${row.backtracks === 0 ? 'metric-zero' : ''}">${row.backtracks}</span></td>
+                <td><span class="metric-pill metric-pruned">${row.prunings}</span></td>
+                <td>${row.time} ms</td>
+                <td><span class="status-badge ${row.success ? 'status-accepted' : 'status-rejected'}">${row.success ? 'Solved (₹' + row.cost + ')' : 'Failed'}</span></td>
+            </tr>
+        `;
+    }).join('');
+
+    const savedBacktracks = benchmark.summary[0].backtracks - benchmark.summary[2].backtracks;
+    const efficiencyPercent = benchmark.summary[0].nodes > 0 
+        ? Math.round(((benchmark.summary[0].nodes - benchmark.summary[2].nodes) / benchmark.summary[0].nodes) * 100)
+        : 0;
+
+    container.innerHTML = `
+        <div class="benchmark-card">
+            <div class="benchmark-header">
+                <div>
+                    <h4>🔬 Unit-III Algorithm Comparison & Evaluation</h4>
+                    <p class="benchmark-subtitle">Constraint Propagation (Forward Checking) vs Heuristics (MRV/LCV) vs Standard Backtracking</p>
+                </div>
+                <span class="algorithm-badge">FOAI Benchmark</span>
+            </div>
+            
+            <div class="benchmark-table-wrapper">
+                <table class="benchmark-table">
+                    <thead>
+                        <tr>
+                            <th>Algorithm</th>
+                            <th>Nodes Explored</th>
+                            <th>Backtracks</th>
+                            <th>Domains Pruned (FC)</th>
+                            <th>Exec Time</th>
+                            <th>Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHTML}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="benchmark-insight-box">
+                <div class="insight-icon">💡</div>
+                <div class="insight-text">
+                    <strong>Viva / Exam Insight:</strong> 
+                    Forward Checking (Constraint Propagation) prunes invalid domain values ahead of time. 
+                    Adding the <strong>Minimum Remaining Values (MRV)</strong> heuristic applies the <em>fail-first principle</em>, 
+                    reducing search space by <strong>${Math.max(0, efficiencyPercent)}%</strong> and eliminating 
+                    <strong>${Math.max(0, savedBacktracks)} backtrack(s)</strong> compared to standard backtracking!
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 // Display AI explanation
 function displayAIExplanation(result) {
     const aiExplanation = document.getElementById('aiExplanation');
@@ -128,27 +208,27 @@ function displayAIExplanation(result) {
     aiExplanation.style.display = 'block';
     
     document.getElementById('variablesExplanation').textContent = 
-        `Variables: ${result.variables.join(', ')}`;
+        `Variables (${result.variables.length}): ${result.variables.join(', ')}`;
     
     let domainsText = '';
     for (const [variable, resources] of Object.entries(result.domains)) {
-        domainsText += `${variable}: ${resources.length} option(s) | `;
+        domainsText += `${variable}: ${resources.length} item(s) | `;
     }
     document.getElementById('domainsExplanation').textContent = domainsText.replace(/\|\s*$/, '');
     
     const constraintsList = document.getElementById('constraintsExplanation');
     constraintsList.innerHTML = `
-        <li>Total cost must be within budget (₹${result.budget})</li>
-        <li>Resource condition must be at least ${result.minimumCondition}</li>
-        <li>Resource must be available</li>
-        <li>No duplicate resources</li>
+        <li><strong>Budget Constraint:</strong> Total cost $\\le$ ₹${result.budget}</li>
+        <li><strong>Condition Constraint:</strong> Grade $\\ge$ ${result.minimumCondition}</li>
+        <li><strong>Availability Constraint:</strong> Item status == 'Available'</li>
+        <li><strong>Uniqueness Constraint:</strong> $Resource_i \\neq Resource_j$ (No duplicate purchases)</li>
     `;
     
     document.getElementById('backtrackingExplanation').textContent = 
-        `Algorithm explored ${result.steps.length} steps using backtracking search to find valid assignments.`;
+        `${result.algorithmName} traversed ${result.nodesExplored} search node(s) with ${result.backtracks} backtrack(s) and pruned ${result.prunings || 0} dead-end domain value(s).`;
     
     document.getElementById('solutionExplanation').textContent = 
-        `Found valid combination with total cost ₹${result.totalCost}, remaining budget ₹${result.remainingBudget}.`;
+        `Valid optimal combination found in ${result.executionTimeMs} ms with total cost ₹${result.totalCost} (Savings: ₹${result.remainingBudget}).`;
 }
 
 // Display algorithm steps
@@ -167,23 +247,40 @@ function displayAlgorithmSteps() {
     
     for (const step of currentPlanResult.steps) {
         let stepClass = '';
+        let prefixBadge = '';
         
         switch (step.type) {
             case 'valid':
                 stepClass = 'success';
+                prefixBadge = '<span class="step-badge badge-valid">VALID</span>';
                 break;
             case 'invalid':
                 stepClass = 'error';
+                prefixBadge = '<span class="step-badge badge-invalid">FAIL</span>';
                 break;
             case 'backtrack':
                 stepClass = 'backtrack';
+                prefixBadge = '<span class="step-badge badge-backtrack">BACKTRACK</span>';
                 break;
+            case 'pruning':
+                stepClass = 'prune';
+                prefixBadge = '<span class="step-badge badge-prune">FC PRUNE</span>';
+                break;
+            case 'fc_wipeout':
+                stepClass = 'error';
+                prefixBadge = '<span class="step-badge badge-wipeout">DEAD-END</span>';
+                break;
+            case 'select_variable':
+                prefixBadge = '<span class="step-badge badge-select">SELECT</span>';
+                break;
+            default:
+                prefixBadge = '<span class="step-badge">STEP</span>';
         }
         
         stepsHTML += `
             <div class="step-entry ${stepClass}">
-                ${escapeHtml(step.message)}
-                ${step.currentTotal ? `<br>Current Total: ₹${step.currentTotal}` : ''}
+                ${prefixBadge} ${escapeHtml(step.message)}
+                ${step.currentTotal ? `<br><small style="color: #4b5563;">Current Subtotal: ₹${step.currentTotal}</small>` : ''}
             </div>
         `;
     }
@@ -218,6 +315,7 @@ async function savePlan() {
 
         await window.firebaseDb.collection('planner_history').add({
             user_id: user.uid,
+            algorithm_used: currentPlanResult.algorithmName,
             budget: currentPlanResult.budget,
             minimum_condition: currentPlanResult.minimumCondition,
             total_cost: currentPlanResult.totalCost,

@@ -14,15 +14,21 @@ CampusShare is a private academic resource-sharing platform for college students
 - Electronics components
 - Project materials
 
-### AI Feature: Smart Resource Planner
+### AI Feature: Smart Resource Planner (Unit-III CSP & Inference Engine)
 
-The main intelligent feature uses **CSP + Backtracking Search** to find the best combination of resources according to student requirements and constraints.
+The core artificial intelligence module implements **Constraint Satisfaction Problems (CSP)** and search algorithms matching the FOAI Unit-III syllabus:
+1. **Simple Backtracking Search (Baseline)**: Chronological depth-first backtracking with static variable ordering.
+2. **Backtracking with Forward Checking (Constraint Propagation)**: Dynamically prunes domain values that violate budget or condition constraints ahead of time, detecting dead-end wipeouts early.
+3. **Optimized Backtracking with FC + MRV + LCV**:
+   - **Minimum Remaining Values (MRV / 'Fail-First' Heuristic)**: Selects the unassigned variable with the fewest remaining valid domain values to trigger quick dead-end detection.
+   - **Least Constraining Value (LCV Heuristic)**: Orders values by minimum cost, leaving the maximum remaining budget for remaining unassigned variables.
+4. **Side-by-Side Algorithm Comparison Benchmarker**: Compares nodes explored, backtracks count, domain prunings, and execution times across all 3 algorithms with live metrics.
 
 ## 🛠 Technology Stack
 
-- **Frontend**: HTML, CSS, Vanilla JavaScript
-- **Backend/Database**: Google Firebase (Cloud Firestore Database, Firebase Authentication)
-- **AI Algorithm**: CSP + Backtracking Search (implemented in JavaScript)
+- **Frontend**: HTML5, Modern CSS, Vanilla JavaScript (ES6+)
+- **Backend/Database**: Google Firebase (Cloud Firestore Native Database, Firebase Authentication)
+- **AI Engine**: Pure custom CSP Solver with Forward Checking, MRV, LCV, and Benchmark Engine (no external libraries)
 
 ## 📁 Project Structure
 
@@ -36,32 +42,48 @@ campusshare/
 ├── marketplace.html
 ├── resource-details.html
 ├── create-listing.html
-├── planner.html
-├── history.html
+├── planner.html                 # Smart Resource Planner & CSP Benchmark Dashboard
+├── history.html                 # Saved Plans History with algorithm tagging
 ├── profile.html
 ├── seller-requests.html         # Seller request management
 ├── my-requests.html             # Buyer request tracking
-├── chat.html                    # Real-time buyer-seller chat
+├── chat.html                    # Real-time buyer-seller chat (Firestore onSnapshot)
 │
 ├── css/
-│   └── style.css
+│   └── style.css                # Modern responsive UI & benchmark dashboard styles
 │
 ├── js/
 │   ├── firebase.js              # Firebase configuration & initialization
-│   ├── auth.js                  # Authentication logic (Firebase Auth)
-│   ├── marketplace.js           # Marketplace functionality (Cloud Firestore)
-│   ├── listing.js               # Listing CRUD operations
-│   ├── cspBacktracking.js       # CSP + Backtracking algorithm
-│   ├── planner.js               # Planner UI integration
-│   ├── history.js               # Planner history
+│   ├── auth.js                  # Authentication logic (Firebase Auth + college email domain check)
+│   ├── marketplace.js           # Marketplace queries & filtering (Cloud Firestore)
+│   ├── listing.js               # Listing CRUD with Base64 canvas image compression
+│   ├── cspBacktracking.js       # Unit-III CSP Solver (Simple BT, FC, MRV, LCV, Benchmark)
+│   ├── planner.js               # Planner UI integration & benchmark visualization
+│   ├── history.js               # Planner history Firestore integration
 │   ├── profile.js               # Profile management
-│   ├── requests.js              # Purchase request handling
-│   └── chat.js                  # Real-time messaging (Firestore onSnapshot)
+│   ├── requests.js              # Purchase request lifecycle (Pending -> Accepted -> Completed)
+│   └── chat.js                  # Real-time messaging with Firestore listeners
 │
-├── firestore.rules              # Firestore Security Rules
-├── FIREBASE_SETUP.md            # Firebase setup & configuration guide
+├── firestore.rules              # Cloud Firestore Security Rules
 └── README.md
 ```
+
+## 🎓 How to Demonstrate During Viva / FOAI Evaluation
+
+### Unit-III CSP Concepts Demonstrated
+1. **Variables ($X$)**: The required items requested by the student (e.g. $[ \text{DBMS Book}, \text{Java Book}, \text{Calculator} ]$).
+2. **Domains ($D$)**: Available marketplace resources matching the required titles and criteria.
+3. **Constraints ($C$)**:
+   - $\sum \text{Price}_i \le \text{Budget}$ (Global numerical constraint)
+   - $\text{Condition}_i \ge \text{Minimum Condition}$ (Unary condition constraint)
+   - $\text{Availability}_i = \text{'Available'}$ (Unary state constraint)
+   - $\text{Resource}_i \neq \text{Resource}_j$ (Binary alldiff/uniqueness constraint)
+
+### Inference & Heuristic Enhancements
+- **Forward Checking (Constraint Propagation)**: When variable $X_k$ is assigned resource $v$, the remaining budget is computed, and any item in unassigned domains that costs more than the remaining budget is immediately pruned. If any unassigned domain becomes empty, the algorithm detects a dead-end wipeout without needlessly expanding deeper nodes.
+- **MRV (Fail-First Principle)**: Selects the variable with the smallest $|D_i|$. If a variable has only 1 available resource, it is assigned immediately before other choices.
+- **LCV (Least Constraining Value)**: Sorts domain values so the most budget-preserving item is attempted first.
+- **Side-by-Side Benchmark**: In `planner.html`, selecting **Benchmark Mode** runs all three algorithms simultaneously, presenting an interactive table showing search tree nodes explored, backtracks required, prunings executed, and millisecond execution times.
 
 ## 🚀 Setup Instructions
 

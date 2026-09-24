@@ -1,5 +1,10 @@
 // ============================================
-// CSP + BACKTRACKING SEARCH ALGORITHM
+// CSP + INFERENCE & SEARCH ALGORITHMS (UNIT-III)
+// Features:
+// 1. Simple Backtracking (Baseline)
+// 2. Backtracking with Forward Checking (Constraint Propagation)
+// 3. Backtracking with FC + MRV (Fail-First) + LCV (Least Constraining Value)
+// 4. Side-by-Side Algorithm Comparison Benchmarker
 // ============================================
 
 // Condition ranking for comparison
@@ -11,203 +16,484 @@ const CONDITION_RANKING = {
     'Poor': 1
 };
 
-// Get condition rank
 function getConditionRank(condition) {
     return CONDITION_RANKING[condition] || 0;
 }
 
-// Check if condition meets minimum requirement
 function meetsConditionRequirement(resourceCondition, minimumCondition) {
     return getConditionRank(resourceCondition) >= getConditionRank(minimumCondition);
-}
-
-// ============================================
-// CSP REPRESENTATION
-// ============================================
-
-class CSP {
-    constructor(variables, domains, constraints) {
-        this.variables = variables; // Array of variable names
-        this.domains = domains; // Object mapping variable -> array of possible values
-        this.constraints = constraints; // Constraint function
-        this.assignment = {}; // Current assignment
-        this.steps = []; // Algorithm steps for visualization
-    }
-}
-
-// ============================================
-// CONSTRAINT FUNCTIONS
-// ============================================
-
-function createConstraints(budget, minimumCondition) {
-    return function(assignment, variable, value, allResources) {
-        // Constraint 1: Budget constraint
-        let totalCost = 0;
-        for (const [varName, assignedValue] of Object.entries(assignment)) {
-            totalCost += assignedValue.price;
-        }
-        totalCost += value.price;
-        
-        if (totalCost > budget) {
-            return { valid: false, reason: `Budget exceeded: ₹${totalCost} > ₹${budget}` };
-        }
-        
-        // Constraint 2: Condition constraint
-        if (!meetsConditionRequirement(value.condition, minimumCondition)) {
-            return { 
-                valid: false, 
-                reason: `Condition constraint failed: ${value.condition} < ${minimumCondition}` 
-            };
-        }
-        
-        // Constraint 3: Availability constraint
-        if (value.availability !== 'Available') {
-            return { valid: false, reason: `Resource not available: ${value.availability}` };
-        }
-        
-        // Constraint 4: No duplicate resources
-        for (const [varName, assignedValue] of Object.entries(assignment)) {
-            if (assignedValue.id === value.id) {
-                return { valid: false, reason: `Duplicate resource: ${value.title}` };
-            }
-        }
-        
-        return { valid: true };
-    };
-}
-
-// ============================================
-// BACKTRACKING SEARCH ALGORITHM
-// ============================================
-
-function solveCSP(variables, domains, constraints, allResources) {
-    const csp = new CSP(variables, domains, constraints);
-    csp.steps = [];
-    
-    const result = backtrack(csp, allResources);
-    
-    return {
-        solution: result.assignment,
-        steps: csp.steps,
-        success: result.success,
-        totalCost: calculateTotalCost(result.assignment),
-        remainingBudget: calculateRemainingBudget(result.assignment, constraints.budget)
-    };
-}
-
-function backtrack(csp, allResources) {
-    // Check if assignment is complete
-    if (isAssignmentComplete(csp)) {
-        return { assignment: csp.assignment, success: true };
-    }
-    
-    // Select unassigned variable
-    const variable = selectUnassignedVariable(csp);
-    csp.steps.push({
-        type: 'select_variable',
-        variable: variable,
-        message: `Selected unassigned variable: ${variable}`
-    });
-    
-    // Get domain for this variable
-    const domain = csp.domains[variable] || [];
-    
-    // Try each value in the domain
-    for (const value of domain) {
-        csp.steps.push({
-            type: 'try_value',
-            variable: variable,
-            value: value.title,
-            price: value.price,
-            condition: value.condition,
-            message: `Trying ${variable} = ${value.title} (₹${value.price}, ${value.condition})`
-        });
-        
-        // Check if assignment is valid
-        const constraintResult = csp.constraints(
-            csp.assignment, 
-            variable, 
-            value, 
-            allResources
-        );
-        
-        if (constraintResult.valid) {
-            csp.steps.push({
-                type: 'valid',
-                variable: variable,
-                value: value.title,
-                message: `✓ Valid: ${variable} = ${value.title}`,
-                currentTotal: calculateTotalCost({...csp.assignment, [variable]: value})
-            });
-            
-            // Make assignment
-            csp.assignment[variable] = value;
-            
-            // Recursively solve
-            const result = backtrack(csp, allResources);
-            
-            if (result.success) {
-                return result;
-            }
-            
-            // Backtrack
-            csp.steps.push({
-                type: 'backtrack',
-                variable: variable,
-                value: value.title,
-                message: `↩ Backtracking from ${variable} = ${value.title}`
-            });
-            
-            delete csp.assignment[variable];
-        } else {
-            csp.steps.push({
-                type: 'invalid',
-                variable: variable,
-                value: value.title,
-                reason: constraintResult.reason,
-                message: `✗ Invalid: ${constraintResult.reason}`
-            });
-        }
-    }
-    
-    // No value worked, return failure
-    csp.steps.push({
-        type: 'failure',
-        variable: variable,
-        message: `No valid value found for ${variable}`
-    });
-    
-    return { assignment: csp.assignment, success: false };
-}
-
-// ============================================
-// CSP HELPER FUNCTIONS
-// ============================================
-
-function isAssignmentComplete(csp) {
-    return csp.variables.every(variable => variable in csp.assignment);
-}
-
-function selectUnassignedVariable(csp) {
-    // Simple heuristic: select first unassigned variable
-    for (const variable of csp.variables) {
-        if (!(variable in csp.assignment)) {
-            return variable;
-        }
-    }
-    return null;
 }
 
 function calculateTotalCost(assignment) {
     let total = 0;
     for (const value of Object.values(assignment)) {
-        total += value.price;
+        total += (value.price || 0);
     }
     return total;
 }
 
 function calculateRemainingBudget(assignment, budget) {
     return budget - calculateTotalCost(assignment);
+}
+
+// Deep clone domains
+function cloneDomains(domains) {
+    const clone = {};
+    for (const [key, list] of Object.entries(domains)) {
+        clone[key] = [...list];
+    }
+    return clone;
+}
+
+// ============================================
+// 1. SIMPLE BACKTRACKING (BASELINE)
+// ============================================
+
+function solveSimpleBacktracking(variables, initialDomains, budget, minimumCondition) {
+    const startTime = performance.now();
+    const steps = [];
+    const assignment = {};
+    let nodesExplored = 0;
+    let backtracks = 0;
+
+    function isValid(currentAssignment, variable, value) {
+        // Budget
+        let cost = calculateTotalCost(currentAssignment) + (value.price || 0);
+        if (cost > budget) {
+            return { valid: false, reason: `Budget exceeded: ₹${cost} > ₹${budget}` };
+        }
+        // Condition
+        if (!meetsConditionRequirement(value.condition, minimumCondition)) {
+            return { valid: false, reason: `Condition failed: ${value.condition} < ${minimumCondition}` };
+        }
+        // Availability
+        if (value.availability !== 'Available') {
+            return { valid: false, reason: `Resource status: ${value.availability}` };
+        }
+        // Duplicate resource
+        for (const assigned of Object.values(currentAssignment)) {
+            if (assigned.id === value.id) {
+                return { valid: false, reason: `Duplicate resource: ${value.title}` };
+            }
+        }
+        return { valid: true };
+    }
+
+    function search() {
+        if (Object.keys(assignment).length === variables.length) {
+            return true;
+        }
+
+        // Static variable ordering (first unassigned)
+        const unassignedVar = variables.find(v => !(v in assignment));
+        const domain = initialDomains[unassignedVar] || [];
+
+        steps.push({
+            type: 'select_variable',
+            algorithm: 'Simple Backtracking',
+            variable: unassignedVar,
+            message: `[Simple BT] Selected variable: ${unassignedVar} (Static Order)`
+        });
+
+        for (const value of domain) {
+            nodesExplored++;
+            steps.push({
+                type: 'try_value',
+                variable: unassignedVar,
+                value: value.title,
+                message: `Trying ${unassignedVar} = ${value.title} (₹${value.price}, ${value.condition})`
+            });
+
+            const check = isValid(assignment, unassignedVar, value);
+            if (check.valid) {
+                assignment[unassignedVar] = value;
+                steps.push({
+                    type: 'valid',
+                    variable: unassignedVar,
+                    value: value.title,
+                    message: `✓ Valid assignment: ${unassignedVar} = ${value.title}`,
+                    currentTotal: calculateTotalCost(assignment)
+                });
+
+                if (search()) {
+                    return true;
+                }
+
+                // Backtrack
+                backtracks++;
+                steps.push({
+                    type: 'backtrack',
+                    variable: unassignedVar,
+                    value: value.title,
+                    message: `↩ Backtracking: Removing ${unassignedVar} = ${value.title}`
+                });
+                delete assignment[unassignedVar];
+            } else {
+                steps.push({
+                    type: 'invalid',
+                    variable: unassignedVar,
+                    value: value.title,
+                    reason: check.reason,
+                    message: `✗ Invalid: ${check.reason}`
+                });
+            }
+        }
+
+        return false;
+    }
+
+    const success = search();
+    const duration = performance.now() - startTime;
+
+    return {
+        algorithmName: 'Simple Backtracking (Standard)',
+        success,
+        solution: success ? { ...assignment } : null,
+        steps,
+        nodesExplored,
+        backtracks,
+        prunings: 0,
+        executionTimeMs: Math.max(0.1, Number(duration.toFixed(2))),
+        totalCost: calculateTotalCost(assignment),
+        remainingBudget: calculateRemainingBudget(assignment, budget)
+    };
+}
+
+// ============================================
+// 2. BACKTRACKING WITH FORWARD CHECKING (INFERENCE)
+// ============================================
+
+function solveForwardChecking(variables, initialDomains, budget, minimumCondition) {
+    const startTime = performance.now();
+    const steps = [];
+    const assignment = {};
+    let nodesExplored = 0;
+    let backtracks = 0;
+    let prunings = 0;
+
+    function forwardCheck(varJustAssigned, valJustAssigned, currentDomains) {
+        const remainingBudget = budget - calculateTotalCost(assignment);
+        const pruned = {};
+
+        for (const otherVar of variables) {
+            if (!(otherVar in assignment)) {
+                pruned[otherVar] = [];
+                const newDomain = [];
+
+                for (const item of currentDomains[otherVar]) {
+                    // Check if item exceeds remaining budget or has duplicate ID or fails condition
+                    const exceedsBudget = (item.price || 0) > remainingBudget;
+                    const isDuplicate = item.id === valJustAssigned.id;
+                    const conditionFails = !meetsConditionRequirement(item.condition, minimumCondition);
+
+                    if (exceedsBudget || isDuplicate || conditionFails) {
+                        pruned[otherVar].push(item);
+                        prunings++;
+                    } else {
+                        newDomain.push(item);
+                    }
+                }
+
+                currentDomains[otherVar] = newDomain;
+
+                if (pruned[otherVar].length > 0) {
+                    steps.push({
+                        type: 'pruning',
+                        variable: otherVar,
+                        prunedCount: pruned[otherVar].length,
+                        message: `🔍 [FC Inference] Pruned ${pruned[otherVar].length} invalid item(s) from domain of '${otherVar}' (Remaining Budget: ₹${remainingBudget})`
+                    });
+                }
+
+                // If domain wiped out, fail immediately!
+                if (currentDomains[otherVar].length === 0) {
+                    steps.push({
+                        type: 'fc_wipeout',
+                        variable: otherVar,
+                        message: `⚠️ [FC Dead-End Detected] Domain of '${otherVar}' became empty! Immediate backtrack triggered.`
+                    });
+                    return { ok: false, pruned };
+                }
+            }
+        }
+
+        return { ok: true, pruned };
+    }
+
+    function restorePruned(currentDomains, pruned) {
+        for (const [varName, removedItems] of Object.entries(pruned)) {
+            currentDomains[varName].push(...removedItems);
+        }
+    }
+
+    function search(domains) {
+        if (Object.keys(assignment).length === variables.length) {
+            return true;
+        }
+
+        const unassignedVar = variables.find(v => !(v in assignment));
+        const domain = [...domains[unassignedVar]];
+
+        steps.push({
+            type: 'select_variable',
+            algorithm: 'Forward Checking',
+            variable: unassignedVar,
+            message: `[FC] Selected variable: ${unassignedVar} (Domain size: ${domain.length})`
+        });
+
+        for (const value of domain) {
+            nodesExplored++;
+            assignment[unassignedVar] = value;
+
+            steps.push({
+                type: 'try_value',
+                variable: unassignedVar,
+                value: value.title,
+                message: `[FC] Assigned ${unassignedVar} = ${value.title} (₹${value.price})`
+            });
+
+            // Perform Forward Checking inference on remaining variables
+            const fcResult = forwardCheck(unassignedVar, value, domains);
+
+            if (fcResult.ok) {
+                if (search(domains)) {
+                    return true;
+                }
+            }
+
+            // Restore domains on backtrack
+            restorePruned(domains, fcResult.pruned);
+            backtracks++;
+            steps.push({
+                type: 'backtrack',
+                variable: unassignedVar,
+                value: value.title,
+                message: `↩ [FC Backtrack] Undoing ${unassignedVar} = ${value.title} and restoring pruned options`
+            });
+            delete assignment[unassignedVar];
+        }
+
+        return false;
+    }
+
+    const currentDomains = cloneDomains(initialDomains);
+    const success = search(currentDomains);
+    const duration = performance.now() - startTime;
+
+    return {
+        algorithmName: 'Backtracking + Forward Checking',
+        success,
+        solution: success ? { ...assignment } : null,
+        steps,
+        nodesExplored,
+        backtracks,
+        prunings,
+        executionTimeMs: Math.max(0.1, Number(duration.toFixed(2))),
+        totalCost: calculateTotalCost(assignment),
+        remainingBudget: calculateRemainingBudget(assignment, budget)
+    };
+}
+
+// ============================================
+// 3. BACKTRACKING + FORWARD CHECKING + MRV + LCV
+// ============================================
+
+function solveForwardCheckingMRVLCV(variables, initialDomains, budget, minimumCondition) {
+    const startTime = performance.now();
+    const steps = [];
+    const assignment = {};
+    let nodesExplored = 0;
+    let backtracks = 0;
+    let prunings = 0;
+
+    // MRV (Minimum Remaining Values): Pick unassigned variable with smallest domain
+    function selectMRVVariable(domains) {
+        let bestVar = null;
+        let minDomainSize = Infinity;
+
+        for (const v of variables) {
+            if (!(v in assignment)) {
+                const domainSize = domains[v].length;
+                if (domainSize < minDomainSize) {
+                    minDomainSize = domainSize;
+                    bestVar = v;
+                }
+            }
+        }
+        return { variable: bestVar, size: minDomainSize };
+    }
+
+    // LCV (Least Constraining Value): Sort values by lowest price (preserves maximum remaining budget for peers)
+    function orderValuesLCV(variable, domain) {
+        return [...domain].sort((a, b) => (a.price || 0) - (b.price || 0));
+    }
+
+    function forwardCheck(varJustAssigned, valJustAssigned, currentDomains) {
+        const remainingBudget = budget - calculateTotalCost(assignment);
+        const pruned = {};
+
+        for (const otherVar of variables) {
+            if (!(otherVar in assignment)) {
+                pruned[otherVar] = [];
+                const newDomain = [];
+
+                for (const item of currentDomains[otherVar]) {
+                    const exceedsBudget = (item.price || 0) > remainingBudget;
+                    const isDuplicate = item.id === valJustAssigned.id;
+                    const conditionFails = !meetsConditionRequirement(item.condition, minimumCondition);
+
+                    if (exceedsBudget || isDuplicate || conditionFails) {
+                        pruned[otherVar].push(item);
+                        prunings++;
+                    } else {
+                        newDomain.push(item);
+                    }
+                }
+
+                currentDomains[otherVar] = newDomain;
+
+                if (pruned[otherVar].length > 0) {
+                    steps.push({
+                        type: 'pruning',
+                        variable: otherVar,
+                        prunedCount: pruned[otherVar].length,
+                        message: `⚡ [MRV+FC] Pruned ${pruned[otherVar].length} item(s) from '${otherVar}' (Remaining: ${newDomain.length})`
+                    });
+                }
+
+                if (currentDomains[otherVar].length === 0) {
+                    steps.push({
+                        type: 'fc_wipeout',
+                        variable: otherVar,
+                        message: `⛔ [Fail-First Pruning] Domain of '${otherVar}' depleted! Pruning branch immediately.`
+                    });
+                    return { ok: false, pruned };
+                }
+            }
+        }
+
+        return { ok: true, pruned };
+    }
+
+    function restorePruned(currentDomains, pruned) {
+        for (const [varName, removedItems] of Object.entries(pruned)) {
+            currentDomains[varName].push(...removedItems);
+        }
+    }
+
+    function search(domains) {
+        if (Object.keys(assignment).length === variables.length) {
+            return true;
+        }
+
+        // Apply MRV Heuristic
+        const { variable: mrvVar, size } = selectMRVVariable(domains);
+        if (!mrvVar) return true;
+
+        steps.push({
+            type: 'select_variable',
+            algorithm: 'MRV + LCV + FC',
+            variable: mrvVar,
+            message: `🎯 [MRV Heuristic] Selected variable '${mrvVar}' with fewest remaining values (${size} options left)`
+        });
+
+        // Apply LCV Heuristic (least constraining values first)
+        const orderedDomain = orderValuesLCV(mrvVar, domains[mrvVar]);
+
+        for (const value of orderedDomain) {
+            nodesExplored++;
+            assignment[mrvVar] = value;
+
+            steps.push({
+                type: 'try_value',
+                variable: mrvVar,
+                value: value.title,
+                message: `[LCV Choice] Trying ${mrvVar} = ${value.title} (Lowest Impact: ₹${value.price})`
+            });
+
+            const fcResult = forwardCheck(mrvVar, value, domains);
+
+            if (fcResult.ok) {
+                if (search(domains)) {
+                    return true;
+                }
+            }
+
+            restorePruned(domains, fcResult.pruned);
+            backtracks++;
+            steps.push({
+                type: 'backtrack',
+                variable: mrvVar,
+                value: value.title,
+                message: `↩ [Backtrack] Undoing ${mrvVar} = ${value.title}`
+            });
+            delete assignment[mrvVar];
+        }
+
+        return false;
+    }
+
+    const currentDomains = cloneDomains(initialDomains);
+    const success = search(currentDomains);
+    const duration = performance.now() - startTime;
+
+    return {
+        algorithmName: 'FC + MRV (Fail-First) + LCV',
+        success,
+        solution: success ? { ...assignment } : null,
+        steps,
+        nodesExplored,
+        backtracks,
+        prunings,
+        executionTimeMs: Math.max(0.1, Number(duration.toFixed(2))),
+        totalCost: calculateTotalCost(assignment),
+        remainingBudget: calculateRemainingBudget(assignment, budget)
+    };
+}
+
+// ============================================
+// 4. BENCHMARK & COMPARISON ENGINE
+// ============================================
+
+function runAllAlgorithmsBenchmark(variables, domains, budget, minimumCondition) {
+    const baseline = solveSimpleBacktracking(variables, domains, budget, minimumCondition);
+    const forwardChecking = solveForwardChecking(variables, domains, budget, minimumCondition);
+    const mrvLcvFC = solveForwardCheckingMRVLCV(variables, domains, budget, minimumCondition);
+
+    return {
+        baseline,
+        forwardChecking,
+        mrvLcvFC,
+        summary: [
+            {
+                name: 'Simple Backtracking (Standard)',
+                nodes: baseline.nodesExplored,
+                backtracks: baseline.backtracks,
+                prunings: baseline.prunings,
+                time: baseline.executionTimeMs,
+                cost: baseline.totalCost,
+                success: baseline.success
+            },
+            {
+                name: 'Backtracking + Forward Checking',
+                nodes: forwardChecking.nodesExplored,
+                backtracks: forwardChecking.backtracks,
+                prunings: forwardChecking.prunings,
+                time: forwardChecking.executionTimeMs,
+                cost: forwardChecking.totalCost,
+                success: forwardChecking.success
+            },
+            {
+                name: 'FC + MRV (Fail-First) + LCV',
+                nodes: mrvLcvFC.nodesExplored,
+                backtracks: mrvLcvFC.backtracks,
+                prunings: mrvLcvFC.prunings,
+                time: mrvLcvFC.executionTimeMs,
+                cost: mrvLcvFC.totalCost,
+                success: mrvLcvFC.success
+            }
+        ]
+    };
 }
 
 // ============================================
@@ -218,15 +504,16 @@ function generateDomains(requiredResources, availableResources) {
     const domains = {};
     
     for (const requiredResource of requiredResources) {
-        // Find resources that match the required resource
+        const requiredWords = requiredResource.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+        
         const matchingResources = availableResources.filter(resource => {
-            const resourceTitle = resource.title.toLowerCase();
-            const requiredTitle = requiredResource.toLowerCase();
+            const title = (resource.title || '').toLowerCase();
+            const subject = (resource.subject || '').toLowerCase();
+            const category = (resource.category || '').toLowerCase();
             
-            // Check if resource title contains required resource name
-            return resourceTitle.includes(requiredTitle) || 
-                   requiredTitle.includes(resourceTitle) ||
-                   resourceTitle.includes(requiredTitle.split(' ')[0]);
+            // Match whole title or any significant keyword
+            return title.includes(requiredResource.toLowerCase()) ||
+                   requiredWords.some(w => title.includes(w) || subject.includes(w) || category.includes(w));
         });
         
         domains[requiredResource] = matchingResources;
@@ -236,150 +523,65 @@ function generateDomains(requiredResources, availableResources) {
 }
 
 // ============================================
-// SOLUTION RANKING
+// MAIN UNIFIED SOLVER
 // ============================================
 
-function rankSolutions(solutions, budget) {
-    if (solutions.length === 0) return null;
-    
-    // Sort solutions by:
-    // 1. Lowest total cost
-    // 2. Better condition (sum of condition ranks)
-    // 3. Fewer sellers
-    
-    return solutions.sort((a, b) => {
-        const costA = calculateTotalCost(a);
-        const costB = calculateTotalCost(b);
-        
-        // Prefer lower cost
-        if (costA !== costB) {
-            return costA - costB;
-        }
-        
-        // If costs are equal, prefer better condition
-        const conditionA = Object.values(a).reduce((sum, r) => sum + getConditionRank(r.condition), 0);
-        const conditionB = Object.values(b).reduce((sum, r) => sum + getConditionRank(r.condition), 0);
-        
-        if (conditionA !== conditionB) {
-            return conditionB - conditionA;
-        }
-        
-        // If conditions are equal, prefer fewer sellers
-        const sellersA = new Set(Object.values(a).map(r => r.seller_id)).size;
-        const sellersB = new Set(Object.values(b).map(r => r.seller_id)).size;
-        
-        return sellersA - sellersB;
-    })[0];
-}
-
-// ============================================
-// MULTIPLE SOLUTIONS (for demonstration)
-// ============================================
-
-function findAllSolutions(variables, domains, constraints, allResources, maxSolutions = 10) {
-    const solutions = [];
-    
-    function backtrackAll(csp, allResources) {
-        if (solutions.length >= maxSolutions) {
-            return;
-        }
-        
-        if (isAssignmentComplete(csp)) {
-            solutions.push({...csp.assignment});
-            return;
-        }
-        
-        const variable = selectUnassignedVariable(csp);
-        const domain = csp.domains[variable] || [];
-        
-        for (const value of domain) {
-            const constraintResult = csp.constraints(
-                csp.assignment, 
-                variable, 
-                value, 
-                allResources
-            );
-            
-            if (constraintResult.valid) {
-                csp.assignment[variable] = value;
-                backtrackAll(csp, allResources);
-                delete csp.assignment[variable];
-            }
-        }
-    }
-    
-    const csp = new CSP(variables, domains, constraints);
-    backtrackAll(csp, allResources);
-    
-    return solutions;
-}
-
-// ============================================
-// MAIN SOLVER FUNCTION
-// ============================================
-
-function solveResourcePlanningProblem(requiredResources, budget, minimumCondition, availableResources) {
-    // Normalize required resources
+function solveResourcePlanningProblem(requiredResources, budget, minimumCondition, availableResources, mode = 'benchmark') {
     const normalizedRequirements = requiredResources
         .map(r => r.trim())
         .filter(r => r.length > 0);
     
     if (normalizedRequirements.length === 0) {
-        return {
-            success: false,
-            error: 'No required resources specified'
-        };
+        return { success: false, error: 'No required resources specified' };
     }
     
     if (availableResources.length === 0) {
-        return {
-            success: false,
-            error: 'No available resources'
-        };
+        return { success: false, error: 'No available resources in marketplace' };
     }
     
-    // Generate domains
     const domains = generateDomains(normalizedRequirements, availableResources);
     
-    // Check if all variables have non-empty domains
     for (const variable of normalizedRequirements) {
         if (!domains[variable] || domains[variable].length === 0) {
             return {
                 success: false,
-                error: `No matching resources found for: ${variable}`
+                error: `No matching resources found for: "${variable}"`
             };
         }
     }
     
-    // Create constraints
-    const constraints = createConstraints(budget, minimumCondition);
-    constraints.budget = budget;
-    
-    // Solve CSP
-    const result = solveCSP(normalizedRequirements, domains, constraints, availableResources);
+    // Execute based on selected mode
+    let result;
+    if (mode === 'simple') {
+        result = solveSimpleBacktracking(normalizedRequirements, domains, budget, minimumCondition);
+    } else if (mode === 'fc') {
+        result = solveForwardChecking(normalizedRequirements, domains, budget, minimumCondition);
+    } else if (mode === 'mrv') {
+        result = solveForwardCheckingMRVLCV(normalizedRequirements, domains, budget, minimumCondition);
+    } else {
+        // Benchmark mode (Runs all 3 and picks optimal)
+        const benchmark = runAllAlgorithmsBenchmark(normalizedRequirements, domains, budget, minimumCondition);
+        result = benchmark.mrvLcvFC.success ? benchmark.mrvLcvFC : (benchmark.forwardChecking.success ? benchmark.forwardChecking : benchmark.baseline);
+        result.benchmark = benchmark;
+    }
     
     return {
-        success: result.success,
-        solution: result.solution,
-        steps: result.steps,
-        totalCost: result.totalCost,
-        remainingBudget: result.remainingBudget,
-        budget: budget,
-        minimumCondition: minimumCondition,
+        ...result,
+        budget,
+        minimumCondition,
         variables: normalizedRequirements,
-        domains: domains
+        domains
     };
 }
 
-// ============================================
-// EXPORT FUNCTIONS
-// ============================================
-
+// Global Export
 window.CSPSolver = {
     solveResourcePlanningProblem,
-    solveCSP,
+    solveSimpleBacktracking,
+    solveForwardChecking,
+    solveForwardCheckingMRVLCV,
+    runAllAlgorithmsBenchmark,
     generateDomains,
-    createConstraints,
     getConditionRank,
     meetsConditionRequirement
 };
