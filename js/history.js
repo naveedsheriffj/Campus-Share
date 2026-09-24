@@ -1,51 +1,56 @@
 // ============================================
-// PLANNER HISTORY MODULE
+// PLANNER HISTORY MODULE (FIREBASE)
 // ============================================
 
-// Fetch planner history for current user
+// Fetch planner history for current user from Firestore
 async function fetchPlannerHistory() {
     const user = await checkAuth();
     if (!user) {
         return [];
     }
     
-    const { data, error } = await window.supabaseClient
-        .from('planner_history')
-        .select(`
-            *,
-            planner_history_items (
-                resource_id,
-                resource_title,
-                price,
-                condition
-            )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-    
-    if (error) {
+    try {
+        const snapshot = await window.firebaseDb.collection('planner_history')
+            .where('user_id', '==', user.uid)
+            .get();
+        
+        const historyList = [];
+        snapshot.forEach(doc => {
+            historyList.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        historyList.sort((a, b) => {
+            const timeA = a.created_at?.toMillis ? a.created_at.toMillis() : (new Date(a.created_at || 0).getTime());
+            const timeB = b.created_at?.toMillis ? b.created_at.toMillis() : (new Date(b.created_at || 0).getTime());
+            return timeB - timeA;
+        });
+        
+        return historyList;
+    } catch (error) {
         console.error('Error fetching planner history:', error);
         return [];
     }
-    
-    return data;
 }
 
 // Render history item
 function renderHistoryItem(history) {
-    const date = new Date(history.created_at).toLocaleDateString('en-US', {
+    const date = history.created_at?.toDate ? history.created_at.toDate().toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
-    });
+    }) : 'Recent Plan';
     
     let resourcesHTML = '';
-    for (const item of history.planner_history_items) {
+    const items = history.items || history.planner_history_items || [];
+    for (const item of items) {
         const priceDisplay = item.price === 0 ? 'Free' : `₹${item.price}`;
         resourcesHTML += `
             <div class="history-resource">
-                <span>${item.resource_title}</span>
-                <span>${priceDisplay} (${item.condition})</span>
+                <span>${escapeHtml(item.resource_title || item.title || '')}</span>
+                <span>${priceDisplay} (${escapeHtml(item.condition || '')})</span>
             </div>
         `;
     }
@@ -99,32 +104,16 @@ function renderHistoryList(history) {
     historyList.innerHTML = history.map(renderHistoryItem).join('');
 }
 
-// Delete history item
+// Delete history item from Firestore
 async function deleteHistory(historyId) {
     if (!confirm('Are you sure you want to delete this saved plan?')) {
         return;
     }
     
     try {
-        // Delete history items first (foreign key constraint)
-        const { error: itemsError } = await window.supabaseClient
-            .from('planner_history_items')
-            .delete()
-            .eq('history_id', historyId);
-        
-        if (itemsError) throw itemsError;
-        
-        // Delete history entry
-        const { error: historyError } = await window.supabaseClient
-            .from('planner_history')
-            .delete()
-            .eq('id', historyId);
-        
-        if (historyError) throw historyError;
-        
+        await window.firebaseDb.collection('planner_history').doc(historyId).delete();
         alert('Plan deleted successfully!');
         
-        // Reload history
         const history = await fetchPlannerHistory();
         renderHistoryList(history);
         

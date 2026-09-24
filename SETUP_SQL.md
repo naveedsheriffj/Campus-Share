@@ -122,6 +122,17 @@ CREATE POLICY "Users can view own profile"
     ON profiles FOR SELECT
     USING (auth.uid() = id);
 
+-- Users can view profiles of sellers with available resources
+CREATE POLICY "Users can view seller profiles"
+    ON profiles FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM resources
+            WHERE resources.seller_id = profiles.id
+            AND resources.availability = 'Available'
+        )
+    );
+
 -- Users can update their own profile
 CREATE POLICY "Users can update own profile"
     ON profiles FOR UPDATE

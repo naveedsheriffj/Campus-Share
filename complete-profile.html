@@ -67,93 +67,70 @@
         </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+    <script src="js/firebase.js"></script>
     <script src="js/auth.js"></script>
     <script>
         // Handle profile completion
         async function handleProfileCompletion(event) {
             event.preventDefault();
             
-            if (!window.supabaseClient) {
-                alert('Supabase client not initialized. Please refresh the page.');
+            if (!window.firebaseDb || !window.firebaseAuth) {
+                alert('Firebase not initialized. Please refresh the page.');
                 return;
             }
             
-            const name = document.getElementById('name').value;
-            const studentId = document.getElementById('studentId').value;
+            const name = document.getElementById('name').value.trim();
+            const studentId = document.getElementById('studentId').value.trim();
             const department = document.getElementById('department').value;
-            const year = document.getElementById('year').value;
+            const year = parseInt(document.getElementById('year').value, 10);
             const errorDiv = document.getElementById('profileError');
             
-            errorDiv.textContent = '';
+            if (errorDiv) errorDiv.textContent = '';
             
             try {
-                // Get current user
-                const { data: { user }, error: userError } = await window.supabaseClient.auth.getUser();
-                
-                if (userError || !user) {
+                const user = await checkAuth();
+                if (!user) {
                     throw new Error('User not authenticated');
                 }
                 
-                // Create or update profile
-                const { data: existingProfile } = await window.supabaseClient
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', user.id)
-                    .single();
+                await window.firebaseDb.collection('profiles').doc(user.uid).set({
+                    id: user.uid,
+                    name: name,
+                    email: user.email,
+                    student_id: studentId,
+                    department: department,
+                    year: year,
+                    updated_at: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
                 
-                if (existingProfile) {
-                    // Update existing profile
-                    const { error: updateError } = await window.supabaseClient
-                        .from('profiles')
-                        .update({
-                            name: name,
-                            student_id: studentId,
-                            department: department,
-                            year: year
-                        })
-                        .eq('id', user.id);
-                    
-                    if (updateError) throw updateError;
-                } else {
-                    // Create new profile
-                    const { error: insertError } = await window.supabaseClient
-                        .from('profiles')
-                        .insert([{
-                            id: user.id,
-                            name: name,
-                            email: user.email,
-                            student_id: studentId,
-                            department: department,
-                            year: year
-                        }]);
-                    
-                    if (insertError) throw insertError;
-                }
-                
-                // Redirect to dashboard
                 window.location.href = 'dashboard.html';
                 
             } catch (error) {
                 console.error('Profile completion error:', error);
-                errorDiv.textContent = error.message || 'Failed to complete profile. Please try again.';
+                if (errorDiv) errorDiv.textContent = error.message || 'Failed to complete profile. Please try again.';
             }
         }
         
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             const form = document.getElementById('completeProfileForm');
             if (form) {
                 form.addEventListener('submit', handleProfileCompletion);
             }
             
-            // Pre-fill name from Google OAuth if available
-            window.supabaseClient.auth.getUser().then(({ data: { user } }) => {
-                if (user && user.user_metadata && user.user_metadata.full_name) {
-                    document.getElementById('name').value = user.user_metadata.full_name;
+            // Pre-fill name and email if available from user auth
+            const user = await checkAuth();
+            if (user) {
+                if (user.displayName) {
+                    const nameInput = document.getElementById('name');
+                    if (nameInput && !nameInput.value) nameInput.value = user.displayName;
                 }
-            });
+            }
         });
     </script>
 </body>

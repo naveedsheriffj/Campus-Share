@@ -52,6 +52,21 @@ ALTER TABLE purchase_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
+# PROFILES TABLE POLICY UPDATE
+## ============================================
+
+-- Add policy to allow viewing profiles through purchase requests
+CREATE POLICY "Users can view profiles through requests"
+    ON profiles FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM purchase_requests
+            WHERE (purchase_requests.buyer_id = profiles.id OR purchase_requests.seller_id = profiles.id)
+            AND (purchase_requests.buyer_id = auth.uid() OR purchase_requests.seller_id = auth.uid())
+        )
+    );
+
+-- ============================================
 # PURCHASE_REQUESTS TABLE POLICIES
 ## ============================================
 

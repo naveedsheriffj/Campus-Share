@@ -21,7 +21,7 @@ The main intelligent feature uses **CSP + Backtracking Search** to find the best
 ## 🛠 Technology Stack
 
 - **Frontend**: HTML, CSS, Vanilla JavaScript
-- **Backend/Database**: Supabase (PostgreSQL, Authentication, Storage)
+- **Backend/Database**: Google Firebase (Cloud Firestore, Authentication, Cloud Storage)
 - **AI Algorithm**: CSP + Backtracking Search (implemented in JavaScript)
 
 ## 📁 Project Structure
@@ -31,6 +31,7 @@ campusshare/
 ├── index.html
 ├── login.html
 ├── register.html
+├── complete-profile.html
 ├── dashboard.html
 ├── marketplace.html
 ├── resource-details.html
@@ -46,22 +47,21 @@ campusshare/
 │   └── style.css
 │
 ├── js/
-│   ├── supabase.js              # Supabase configuration
-│   ├── auth.js                  # Authentication logic
-│   ├── marketplace.js           # Marketplace functionality
-│   ├── listing.js               # Listing CRUD operations
+│   ├── firebase.js              # Firebase configuration & initialization
+│   ├── auth.js                  # Authentication logic (Firebase Auth)
+│   ├── marketplace.js           # Marketplace functionality (Cloud Firestore)
+│   ├── listing.js               # Listing CRUD & Cloud Storage operations
 │   ├── cspBacktracking.js       # CSP + Backtracking algorithm
 │   ├── planner.js               # Planner UI integration
 │   ├── history.js               # Planner history
 │   ├── profile.js               # Profile management
 │   ├── requests.js              # Purchase request handling
-│   └── chat.js                  # Real-time messaging
+│   └── chat.js                  # Real-time messaging (Firestore onSnapshot)
 │
-├── assets/                      # (optional) Static assets
-├── README.md
-├── SETUP_SQL.md                 # Database schema and RLS policies
-├── REQUESTS_CHAT_SQL.md        # Purchase requests & chat system
-└── SAMPLE_DATA.sql              # Sample data insertion
+├── firestore.rules              # Firestore Security Rules
+├── storage.rules                # Cloud Storage Security Rules
+├── FIREBASE_SETUP.md            # Firebase setup & configuration guide
+└── README.md
 ```
 
 ## 🚀 Setup Instructions

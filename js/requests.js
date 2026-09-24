@@ -1,5 +1,5 @@
 // ============================================
-// PURCHASE REQUESTS MODULE
+// PURCHASE REQUESTS MODULE (FIREBASE)
 // ============================================
 
 // Create a purchase request
@@ -11,60 +11,69 @@ async function createPurchaseRequest(resourceId, message, pickupLocation) {
     }
 
     try {
-        // Get resource details to check seller
-        const { data: resource, error: resourceError } = await window.supabaseClient
-            .from('resources')
-            .select('seller_id, title, listing_type')
-            .eq('id', resourceId)
-            .single();
+        const resourceDoc = await window.firebaseDb.collection('resources').doc(resourceId).get();
+        if (!resourceDoc.exists) {
+            showNotification('Resource not found', 'error');
+            return null;
+        }
 
-        if (resourceError) throw resourceError;
+        const resource = resourceDoc.data();
         
         // Prevent requesting own listings
-        if (resource.seller_id === user.id) {
+        if (resource.seller_id === user.uid) {
             showNotification('You cannot request your own listing', 'error');
             return null;
         }
 
         // Check for existing active request
-        const { data: existingRequest, error: checkError } = await window.supabaseClient
-            .from('purchase_requests')
-            .select('id')
-            .eq('resource_id', resourceId)
-            .eq('buyer_id', user.id)
-            .in('status', ['PENDING', 'ACCEPTED'])
-            .maybeSingle();
+        const existingSnapshot = await window.firebaseDb.collection('purchase_requests')
+            .where('resource_id', '==', resourceId)
+            .where('buyer_id', '==', user.uid)
+            .get();
 
-        if (checkError && checkError.code !== 'PGRST116') throw checkError;
-        
-        if (existingRequest) {
+        let hasActive = false;
+        existingSnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.status === 'PENDING' || data.status === 'ACCEPTED') {
+                hasActive = true;
+            }
+        });
+
+        if (hasActive) {
             showNotification('You already have an active request for this item', 'error');
             return null;
         }
 
-        // Determine action text based on listing type
+        const buyerProfile = await getUserProfile(user.uid);
+
         const actionText = resource.listing_type === 'Rent' ? 'rent' : 
                           resource.listing_type === 'Exchange' ? 'exchange' : 
                           resource.listing_type === 'Donate' ? 'request' : 'buy';
 
-        // Create the request
-        const { data, error } = await window.supabaseClient
-            .from('purchase_requests')
-            .insert({
-                resource_id: resourceId,
-                buyer_id: user.id,
-                seller_id: resource.seller_id,
-                message: message,
-                pickup_location: pickupLocation,
-                status: 'PENDING'
-            })
-            .select()
-            .single();
+        const requestData = {
+            resource_id: resourceId,
+            resource_title: resource.title,
+            resource_image_url: resource.image_url || '',
+            resource_price: resource.price ?? 0,
+            resource_listing_type: resource.listing_type || 'Sell',
+            buyer_id: user.uid,
+            buyer_name: buyerProfile?.name || user.displayName || 'Student Buyer',
+            buyer_email: user.email || '',
+            buyer_department: buyerProfile?.department || '',
+            seller_id: resource.seller_id,
+            seller_name: resource.seller_name || 'Seller',
+            seller_email: resource.seller_email || '',
+            message: message,
+            pickup_location: pickupLocation,
+            status: 'PENDING',
+            created_at: firebase.firestore.FieldValue.serverTimestamp(),
+            updated_at: firebase.firestore.FieldValue.serverTimestamp()
+        };
 
-        if (error) throw error;
-
+        const docRef = await window.firebaseDb.collection('purchase_requests').add(requestData);
         showNotification(`Request to ${actionText} "${resource.title}" sent successfully!`, 'success');
-        return data;
+        return { id: docRef.id, ...requestData };
+
     } catch (error) {
         console.error('Error creating purchase request:', error);
         showNotification('Failed to send request. Please try again.', 'error');
@@ -78,18 +87,38 @@ async function getMyRequests() {
     if (!user) return [];
 
     try {
-        const { data, error } = await window.supabaseClient
-            .from('purchase_requests')
-            .select(`
-                *,
-                resources:resource_id (title, image_url, price, listing_type),
-                seller:seller_id (name, email)
-            `)
-            .eq('buyer_id', user.id)
-            .order('created_at', { ascending: false });
+        const snapshot = await window.firebaseDb.collection('purchase_requests')
+            .where('buyer_id', '==', user.uid)
+            .get();
 
-        if (error) throw error;
-        return data || [];
+        const requests = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            requests.push({
+                id: doc.id,
+                ...data,
+                // Normalized object structure for template compatibility
+                resources: {
+                    title: data.resource_title,
+                    image_url: data.resource_image_url,
+                    price: data.resource_price,
+                    listing_type: data.resource_listing_type
+                },
+                seller: {
+                    name: data.seller_name,
+                    email: data.seller_email
+                }
+            });
+        });
+
+        // Sort descending by date
+        requests.sort((a, b) => {
+            const timeA = a.created_at?.toMillis ? a.created_at.toMillis() : (new Date(a.created_at || 0).getTime());
+            const timeB = b.created_at?.toMillis ? b.created_at.toMillis() : (new Date(b.created_at || 0).getTime());
+            return timeB - timeA;
+        });
+
+        return requests;
     } catch (error) {
         console.error('Error fetching my requests:', error);
         return [];
@@ -102,18 +131,37 @@ async function getSellerRequests() {
     if (!user) return [];
 
     try {
-        const { data, error } = await window.supabaseClient
-            .from('purchase_requests')
-            .select(`
-                *,
-                resources:resource_id (title, image_url, price, listing_type),
-                buyer:buyer_id (name, email, department)
-            `)
-            .eq('seller_id', user.id)
-            .order('created_at', { ascending: false });
+        const snapshot = await window.firebaseDb.collection('purchase_requests')
+            .where('seller_id', '==', user.uid)
+            .get();
 
-        if (error) throw error;
-        return data || [];
+        const requests = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            requests.push({
+                id: doc.id,
+                ...data,
+                resources: {
+                    title: data.resource_title,
+                    image_url: data.resource_image_url,
+                    price: data.resource_price,
+                    listing_type: data.resource_listing_type
+                },
+                buyer: {
+                    name: data.buyer_name,
+                    email: data.buyer_email,
+                    department: data.buyer_department
+                }
+            });
+        });
+
+        requests.sort((a, b) => {
+            const timeA = a.created_at?.toMillis ? a.created_at.toMillis() : (new Date(a.created_at || 0).getTime());
+            const timeB = b.created_at?.toMillis ? b.created_at.toMillis() : (new Date(b.created_at || 0).getTime());
+            return timeB - timeA;
+        });
+
+        return requests;
     } catch (error) {
         console.error('Error fetching seller requests:', error);
         return [];
@@ -126,43 +174,38 @@ async function updateRequestStatus(requestId, newStatus) {
     if (!user) return false;
 
     try {
-        const { data: request, error: fetchError } = await window.supabaseClient
-            .from('purchase_requests')
-            .select('*, resources:resource_id (id)')
-            .eq('id', requestId)
-            .single();
+        const reqRef = window.firebaseDb.collection('purchase_requests').doc(requestId);
+        const reqDoc = await reqRef.get();
 
-        if (fetchError) throw fetchError;
+        if (!reqDoc.exists) {
+            showNotification('Request not found', 'error');
+            return false;
+        }
 
-        // Verify user is seller
-        if (request.seller_id !== user.id) {
+        const request = reqDoc.data();
+
+        // Verify current user is seller
+        if (request.seller_id !== user.uid) {
             showNotification('You can only update requests for your listings', 'error');
             return false;
         }
 
         // Update request status
-        const { error } = await window.supabaseClient
-            .from('purchase_requests')
-            .update({ status: newStatus })
-            .eq('id', requestId);
+        await reqRef.update({
+            status: newStatus,
+            updated_at: firebase.firestore.FieldValue.serverTimestamp()
+        });
 
-        if (error) throw error;
-
-        // If completing or accepting, update resource availability
-        if (newStatus === 'COMPLETED' || newStatus === 'ACCEPTED') {
-            const availability = newStatus === 'COMPLETED' ? 'Sold' : 'Reserved';
-            await window.supabaseClient
-                .from('resources')
-                .update({ availability: availability })
-                .eq('id', request.resource_id);
-        }
-
-        // If rejecting, make resource available again
-        if (newStatus === 'REJECTED') {
-            await window.supabaseClient
-                .from('resources')
-                .update({ availability: 'Available' })
-                .eq('id', request.resource_id);
+        // Update resource availability
+        if (request.resource_id) {
+            const resourceRef = window.firebaseDb.collection('resources').doc(request.resource_id);
+            if (newStatus === 'COMPLETED') {
+                await resourceRef.update({ availability: 'Sold', updated_at: firebase.firestore.FieldValue.serverTimestamp() });
+            } else if (newStatus === 'ACCEPTED') {
+                await resourceRef.update({ availability: 'Reserved', updated_at: firebase.firestore.FieldValue.serverTimestamp() });
+            } else if (newStatus === 'REJECTED') {
+                await resourceRef.update({ availability: 'Available', updated_at: firebase.firestore.FieldValue.serverTimestamp() });
+            }
         }
 
         const statusMessages = {
@@ -171,7 +214,12 @@ async function updateRequestStatus(requestId, newStatus) {
             'COMPLETED': 'Transaction marked as completed!'
         };
 
-        showNotification(statusMessages[newStatus], newStatus === 'REJECTED' ? 'error' : 'success');
+        showNotification(statusMessages[newStatus] || 'Status updated', newStatus === 'REJECTED' ? 'error' : 'success');
+        
+        // Refresh page requests view
+        if (document.getElementById('sellerRequestsPage')) {
+            initSellerRequests();
+        }
         return true;
     } catch (error) {
         console.error('Error updating request status:', error);
@@ -199,17 +247,19 @@ function renderBuyerRequestCard(request) {
                       request.resources?.listing_type === 'Exchange' ? 'Exchange' : 
                       request.resources?.listing_type === 'Donate' ? 'Request' : 'Buy';
 
+    const reqDate = request.created_at?.toDate ? request.created_at.toDate().toLocaleDateString() : 'Recent';
+
     return `
         <div class="request-card">
-            <img src="${imageUrl}" alt="${request.resources?.title}" class="request-image" onerror="this.src='https://via.placeholder.com/100x100?text=No+Image'">
+            <img src="${imageUrl}" alt="${escapeHtml(request.resources?.title || '')}" class="request-image" onerror="this.src='https://via.placeholder.com/100x100?text=No+Image'">
             <div class="request-content">
-                <h3>${request.resources?.title}</h3>
+                <h3>${escapeHtml(request.resources?.title || '')}</h3>
                 <p class="request-price">${priceDisplay}</p>
                 <p class="request-type">${actionText} Request</p>
                 <div class="request-status">${getStatusBadge(request.status)}</div>
-                <p class="request-message"><strong>Your message:</strong> ${request.message}</p>
-                <p class="request-pickup"><strong>Pickup:</strong> ${request.pickup_location}</p>
-                <p class="request-date">Requested: ${new Date(request.created_at).toLocaleDateString()}</p>
+                <p class="request-message"><strong>Your message:</strong> ${escapeHtml(request.message || '')}</p>
+                <p class="request-pickup"><strong>Pickup:</strong> ${escapeHtml(request.pickup_location || '')}</p>
+                <p class="request-date">Requested: ${reqDate}</p>
                 ${request.status === 'ACCEPTED' ? `
                     <button onclick="openChat('${request.id}')" class="btn btn-primary btn-sm">Open Chat</button>
                 ` : ''}
@@ -222,19 +272,20 @@ function renderBuyerRequestCard(request) {
 function renderSellerRequestCard(request) {
     const imageUrl = request.resources?.image_url || 'https://via.placeholder.com/100x100?text=No+Image';
     const priceDisplay = request.resources?.listing_type === 'Donate' ? 'Free' : `₹${request.resources?.price}`;
+    const reqDate = request.created_at?.toDate ? request.created_at.toDate().toLocaleDateString() : 'Recent';
 
     return `
         <div class="request-card">
-            <img src="${imageUrl}" alt="${request.resources?.title}" class="request-image" onerror="this.src='https://via.placeholder.com/100x100?text=No+Image'">
+            <img src="${imageUrl}" alt="${escapeHtml(request.resources?.title || '')}" class="request-image" onerror="this.src='https://via.placeholder.com/100x100?text=No+Image'">
             <div class="request-content">
-                <h3>${request.resources?.title}</h3>
+                <h3>${escapeHtml(request.resources?.title || '')}</h3>
                 <p class="request-price">${priceDisplay}</p>
-                <p class="request-buyer"><strong>Buyer:</strong> ${request.buyer?.name}</p>
-                <p class="request-buyer-email">${request.buyer?.email}</p>
+                <p class="request-buyer"><strong>Buyer:</strong> ${escapeHtml(request.buyer?.name || '')}</p>
+                <p class="request-buyer-email">${escapeHtml(request.buyer?.email || '')}</p>
                 <div class="request-status">${getStatusBadge(request.status)}</div>
-                <p class="request-message"><strong>Message:</strong> ${request.message}</p>
-                <p class="request-pickup"><strong>Pickup Location:</strong> ${request.pickup_location}</p>
-                <p class="request-date">Requested: ${new Date(request.created_at).toLocaleDateString()}</p>
+                <p class="request-message"><strong>Message:</strong> ${escapeHtml(request.message || '')}</p>
+                <p class="request-pickup"><strong>Pickup Location:</strong> ${escapeHtml(request.pickup_location || '')}</p>
+                <p class="request-date">Requested: ${reqDate}</p>
                 ${request.status === 'PENDING' ? `
                     <div class="request-actions">
                         <button onclick="updateRequestStatus('${request.id}', 'ACCEPTED')" class="btn btn-primary btn-sm">Accept</button>

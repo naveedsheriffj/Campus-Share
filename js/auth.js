@@ -1,37 +1,41 @@
 // ============================================
-// AUTHENTICATION MODULE
+// AUTHENTICATION MODULE (FIREBASE)
 // ============================================
 
 // Show notification toast
 function showNotification(message, type = 'info') {
-    // Remove existing notification if any
     const existingNotification = document.querySelector('.notification-toast');
     if (existingNotification) {
         existingNotification.remove();
     }
 
-    // Create notification element
     const notification = document.createElement('div');
     notification.className = `notification-toast notification-${type}`;
     notification.textContent = message;
 
-    // Add to document
     document.body.appendChild(notification);
 
-    // Auto remove after 3 seconds
     setTimeout(() => {
         notification.remove();
     }, 3000);
 }
 
-// Check if user is authenticated
-async function checkAuth() {
-    if (!window.supabaseClient) {
-        console.error('Supabase client not initialized');
-        return null;
-    }
-    const { data: { user } } = await window.supabaseClient.auth.getUser();
-    return user;
+// Check if user is authenticated (resolves current user or null)
+function checkAuth() {
+    return new Promise((resolve) => {
+        if (!window.firebaseAuth) {
+            console.error('Firebase Auth not initialized yet');
+            resolve(null);
+            return;
+        }
+        const unsubscribe = window.firebaseAuth.onAuthStateChanged((user) => {
+            unsubscribe();
+            resolve(user || null);
+        }, (error) => {
+            console.error('Auth state change error:', error);
+            resolve(null);
+        });
+    });
 }
 
 // Redirect if not authenticated
@@ -57,106 +61,99 @@ async function requireGuest() {
 // Validate college email
 function validateCollegeEmail(email) {
     const domain = window.COLLEGE_EMAIL_DOMAIN || 'rajalakshmi.edu.in';
-    const emailRegex = new RegExp(`^[a-zA-Z0-9._%+-]+@${domain.replace('.', '\\.')}$`);
+    const emailRegex = new RegExp(`^[a-zA-Z0-9._%+-]+@${domain.replace('.', '\\.')}$`, 'i');
     return emailRegex.test(email);
 }
 
-// Get user profile
+// Get user profile from Firestore
 async function getUserProfile(userId) {
-    if (!window.supabaseClient) {
-        console.error('Supabase client not initialized');
+    if (!window.firebaseDb) {
+        console.error('Firebase Firestore not initialized');
         return null;
     }
-    const { data, error } = await window.supabaseClient
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-    
-    if (error) {
+    try {
+        const doc = await window.firebaseDb.collection('profiles').doc(userId).get();
+        if (doc.exists) {
+            return { id: doc.id, ...doc.data() };
+        }
+        return null;
+    } catch (error) {
         console.error('Error fetching profile:', error);
         return null;
     }
-    
-    return data;
 }
 
-// Create user profile
+// Create user profile in Firestore
 async function createUserProfile(userId, profileData) {
-    if (!window.supabaseClient) {
-        console.error('Supabase client not initialized');
-        return { success: false, error: 'Supabase client not initialized' };
+    if (!window.firebaseDb) {
+        console.error('Firebase Firestore not initialized');
+        return { success: false, error: new Error('Firestore not initialized') };
     }
-    const { data, error } = await window.supabaseClient
-        .from('profiles')
-        .insert([{
+    try {
+        const data = {
             id: userId,
-            name: profileData.name,
-            email: profileData.email,
-            student_id: profileData.studentId,
-            department: profileData.department,
-            year: profileData.year
-        }]);
-    
-    if (error) {
+            name: profileData.name || '',
+            email: profileData.email || '',
+            student_id: profileData.studentId || '',
+            department: profileData.department || '',
+            year: parseInt(profileData.year, 10) || 1,
+            created_at: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        await window.firebaseDb.collection('profiles').doc(userId).set(data);
+        return { success: true, data };
+    } catch (error) {
         console.error('Error creating profile:', error);
         return { success: false, error };
     }
-    
-    return { success: true, data };
 }
 
-// Update user profile
+// Update user profile in Firestore
 async function updateUserProfile(userId, profileData) {
-    if (!window.supabaseClient) {
-        console.error('Supabase client not initialized');
-        return { success: false, error: 'Supabase client not initialized' };
+    if (!window.firebaseDb) {
+        console.error('Firebase Firestore not initialized');
+        return { success: false, error: new Error('Firestore not initialized') };
     }
-    const { data, error } = await window.supabaseClient
-        .from('profiles')
-        .update({
+    try {
+        const updates = {
             name: profileData.name,
             student_id: profileData.studentId,
             department: profileData.department,
-            year: profileData.year
-        })
-        .eq('id', userId);
-    
-    if (error) {
+            year: parseInt(profileData.year, 10) || 1,
+            updated_at: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        await window.firebaseDb.collection('profiles').doc(userId).update(updates);
+        return { success: true, data: updates };
+    } catch (error) {
         console.error('Error updating profile:', error);
         return { success: false, error };
     }
-    
-    return { success: true, data };
 }
 
 // Login handler
 async function handleLogin(event) {
     event.preventDefault();
     
-    if (!window.supabaseClient) {
+    if (!window.firebaseAuth) {
         const errorDiv = document.getElementById('loginError');
-        errorDiv.textContent = 'Supabase client not initialized. Please refresh the page.';
+        if (errorDiv) errorDiv.textContent = 'Firebase not initialized. Please refresh the page.';
         return;
     }
     
-    const email = document.getElementById('email').value;
+    const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('loginError');
     
-    errorDiv.textContent = '';
+    if (errorDiv) errorDiv.textContent = '';
     
     try {
-        const { data, error } = await window.supabaseClient.auth.signInWithPassword({
-            email: email,
-            password: password
-        });
-        
-        if (error) throw error;
-        
+        await window.firebaseAuth.signInWithEmailAndPassword(email, password);
         window.location.href = 'dashboard.html';
     } catch (error) {
-        errorDiv.textContent = error.message || 'Login failed. Please try again.';
+        let msg = error.message;
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+            msg = 'Invalid email or password.';
+        }
+        if (errorDiv) errorDiv.textContent = msg;
     }
 }
 
@@ -164,90 +161,101 @@ async function handleLogin(event) {
 async function handleRegister(event) {
     event.preventDefault();
     
-    if (!window.supabaseClient) {
+    if (!window.firebaseAuth || !window.firebaseDb) {
         const errorDiv = document.getElementById('registerError');
-        errorDiv.textContent = 'Supabase client not initialized. Please refresh the page.';
+        if (errorDiv) errorDiv.textContent = 'Firebase not initialized. Please refresh the page.';
         return;
     }
     
-    const name = document.getElementById('name').value;
-    const email = document.getElementById('email').value;
-    const studentId = document.getElementById('studentId').value;
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const studentId = document.getElementById('studentId').value.trim();
     const department = document.getElementById('department').value;
     const year = document.getElementById('year').value;
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
     const errorDiv = document.getElementById('registerError');
     
-    errorDiv.textContent = '';
+    if (errorDiv) {
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = '';
+    }
     
     // Validate email domain
     if (!validateCollegeEmail(email)) {
-        errorDiv.textContent = `Please use a valid ${window.COLLEGE_EMAIL_DOMAIN || 'rajalakshmi.edu.in'} email address.`;
+        if (errorDiv) errorDiv.textContent = `Please use a valid ${window.COLLEGE_EMAIL_DOMAIN || 'rajalakshmi.edu.in'} email address.`;
         return;
     }
     
     // Validate password match
     if (password !== confirmPassword) {
-        errorDiv.textContent = 'Passwords do not match.';
+        if (errorDiv) errorDiv.textContent = 'Passwords do not match.';
         return;
     }
     
     try {
         // Create auth user
-        const { data: authData, error: authError } = await window.supabaseClient.auth.signUp({
-            email: email,
-            password: password,
-            options: {
-                emailRedirectTo: window.location.origin + '/dashboard.html'
-            }
+        const userCredential = await window.firebaseAuth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        
+        // Update displayName in auth
+        await user.updateProfile({ displayName: name });
+        
+        // Create Firestore profile
+        const profileResult = await createUserProfile(user.uid, {
+            name,
+            email,
+            studentId,
+            department,
+            year
         });
         
-        if (authError) throw authError;
-        
-        // Create profile
-        if (authData.user) {
-            const profileResult = await createUserProfile(authData.user.id, {
-                name,
-                email,
-                studentId,
-                department,
-                year
-            });
-            
-            if (!profileResult.success) {
-                throw profileResult.error;
-            }
+        if (!profileResult.success) {
+            throw profileResult.error;
+        }
+
+        // Send email verification
+        try {
+            await user.sendEmailVerification();
+        } catch (e) {
+            console.log('Verification email dispatch notice:', e);
         }
         
         // Show success message
-        errorDiv.className = 'success-message';
-        errorDiv.textContent = 'Registration successful! Please check your email to verify your account.';
+        if (errorDiv) {
+            errorDiv.className = 'success-message';
+            errorDiv.textContent = 'Registration successful! Redirecting to your dashboard...';
+        }
         
         // Clear form
         document.getElementById('registerForm').reset();
         
-        // Redirect after 2 seconds
         setTimeout(() => {
-            window.location.href = 'login.html';
-        }, 2000);
+            window.location.href = 'dashboard.html';
+        }, 1500);
         
     } catch (error) {
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = error.message || 'Registration failed. Please try again.';
+        let msg = error.message;
+        if (error.code === 'auth/email-already-in-use') {
+            msg = 'This email is already registered. Please login instead.';
+        } else if (error.code === 'auth/weak-password') {
+            msg = 'Password is too weak. Please use at least 6 characters.';
+        }
+        if (errorDiv) {
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = msg;
+        }
     }
 }
 
 // Logout handler
 async function handleLogout() {
-    if (!window.supabaseClient) {
-        console.error('Supabase client not initialized');
+    if (!window.firebaseAuth) {
         window.location.href = 'index.html';
         return;
     }
     try {
-        const { error } = await window.supabaseClient.auth.signOut();
-        if (error) throw error;
+        await window.firebaseAuth.signOut();
         window.location.href = 'index.html';
     } catch (error) {
         console.error('Logout error:', error);
@@ -257,62 +265,44 @@ async function handleLogout() {
 
 // Google Login handler
 async function handleGoogleLogin() {
-    if (!window.supabaseClient) {
-        alert('Supabase client not initialized. Please refresh the page.');
+    if (!window.firebaseAuth) {
+        alert('Firebase not initialized. Please refresh the page.');
         return;
     }
     
     try {
-        const { data, error } = await window.supabaseClient.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: window.location.origin + '/dashboard.html'
-            }
-        });
+        const provider = new firebase.auth.GoogleAuthProvider();
+        const result = await window.firebaseAuth.signInWithPopup(provider);
+        const user = result.user;
         
-        if (error) throw error;
-        
-        // The user will be redirected to Google for authentication
+        // Check if user already has a complete profile
+        const profile = await getUserProfile(user.uid);
+        if (!profile || !profile.student_id) {
+            window.location.href = 'complete-profile.html';
+        } else {
+            window.location.href = 'dashboard.html';
+        }
     } catch (error) {
         console.error('Google login error:', error);
-        alert('Google login failed. Please try again.');
+        if (error.code !== 'auth/popup-closed-by-user') {
+            alert('Google login failed: ' + error.message);
+        }
     }
 }
 
-// Google Register handler (same as login for OAuth)
+// Google Register handler
 async function handleGoogleRegister() {
-    if (!window.supabaseClient) {
-        alert('Supabase client not initialized. Please refresh the page.');
-        return;
-    }
-    
-    try {
-        const { data, error } = await window.supabaseClient.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: window.location.origin + '/complete-profile.html'
-            }
-        });
-        
-        if (error) throw error;
-        
-        // The user will be redirected to Google for authentication
-    } catch (error) {
-        console.error('Google registration error:', error);
-        alert('Google registration failed. Please try again.');
-    }
+    await handleGoogleLogin();
 }
 
 // Initialize auth on page load
 function initAuth() {
-    // Wait for Supabase to be initialized
-    if (!window.supabaseClient) {
-        console.log('Waiting for Supabase client to initialize...');
+    if (!window.firebaseAuth) {
         setTimeout(initAuth, 100);
         return;
     }
     
-    console.log('Initializing auth module...');
+    console.log('Initializing auth module (Firebase)...');
     
     // Login page
     const loginForm = document.getElementById('loginForm');
@@ -353,7 +343,8 @@ function initAuth() {
                           'create-listing.html', 'planner.html', 'history.html', 'profile.html',
                           'seller-requests.html', 'my-requests.html', 'chat.html'];
     
-    if (protectedPages.includes(window.location.pathname.split('/').pop())) {
+    const currentPage = window.location.pathname.split('/').pop();
+    if (protectedPages.includes(currentPage)) {
         requireAuth();
     }
 }

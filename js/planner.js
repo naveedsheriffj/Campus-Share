@@ -1,5 +1,5 @@
 // ============================================
-// SMART RESOURCE PLANNER MODULE
+// SMART RESOURCE PLANNER MODULE (FIREBASE)
 // ============================================
 
 // Current planner state
@@ -25,14 +25,13 @@ async function handlePlannerSubmit(event) {
         return;
     }
     
-    // Store requirements
     currentPlanRequirements = {
         requiredResources,
         budget,
         minimumCondition
     };
     
-    // Fetch available resources
+    // Fetch available resources from Firestore
     const availableResources = await fetchResources();
     
     if (availableResources.length === 0) {
@@ -40,7 +39,7 @@ async function handlePlannerSubmit(event) {
         return;
     }
     
-    // Solve CSP
+    // Solve CSP using our custom algorithm
     const result = window.CSPSolver.solveResourcePlanningProblem(
         requiredResources,
         budget,
@@ -50,10 +49,7 @@ async function handlePlannerSubmit(event) {
     
     currentPlanResult = result;
     
-    // Display results
     displayPlannerResults(result);
-    
-    // Display AI explanation
     displayAIExplanation(result);
 }
 
@@ -76,18 +72,18 @@ function displayPlannerResults(result) {
     
     resultsSection.style.display = 'block';
     
-    // Build solution HTML
     let solutionHTML = '<div class="solution-items">';
     
     for (const [variable, resource] of Object.entries(result.solution)) {
         const priceDisplay = resource.listing_type === 'Donate' ? 'Free' : `₹${resource.price}`;
+        const sellerName = resource.profiles?.name || resource.seller_name || 'Seller';
         
         solutionHTML += `
             <div class="solution-item">
                 <div class="solution-resource">
-                    <h4>${variable}</h4>
-                    <p>${resource.title}</p>
-                    <p style="font-size: 0.875rem; color: #6b7280;">Condition: ${resource.condition} | Seller: ${resource.profiles?.name || 'Unknown'}</p>
+                    <h4>${escapeHtml(variable)}</h4>
+                    <p>${escapeHtml(resource.title)}</p>
+                    <p style="font-size: 0.875rem; color: #6b7280;">Condition: ${escapeHtml(resource.condition)} | Seller: ${escapeHtml(sellerName)}</p>
                 </div>
                 <div class="solution-price">${priceDisplay}</div>
             </div>
@@ -96,7 +92,6 @@ function displayPlannerResults(result) {
     
     solutionHTML += '</div>';
     
-    // Add summary
     solutionHTML += `
         <div class="solution-summary">
             <div class="summary-row">
@@ -113,7 +108,7 @@ function displayPlannerResults(result) {
             </div>
             <div class="summary-row">
                 <span class="summary-label">Minimum Condition:</span>
-                <span class="summary-value">${result.minimumCondition}</span>
+                <span class="summary-value">${escapeHtml(result.minimumCondition)}</span>
             </div>
         </div>
     `;
@@ -132,18 +127,15 @@ function displayAIExplanation(result) {
     
     aiExplanation.style.display = 'block';
     
-    // Variables explanation
     document.getElementById('variablesExplanation').textContent = 
         `Variables: ${result.variables.join(', ')}`;
     
-    // Domains explanation
     let domainsText = '';
     for (const [variable, resources] of Object.entries(result.domains)) {
-        domainsText += `${variable}: ${resources.length} option(s)`;
+        domainsText += `${variable}: ${resources.length} option(s) | `;
     }
-    document.getElementById('domainsExplanation').textContent = domainsText;
+    document.getElementById('domainsExplanation').textContent = domainsText.replace(/\|\s*$/, '');
     
-    // Constraints explanation
     const constraintsList = document.getElementById('constraintsExplanation');
     constraintsList.innerHTML = `
         <li>Total cost must be within budget (₹${result.budget})</li>
@@ -152,11 +144,9 @@ function displayAIExplanation(result) {
         <li>No duplicate resources</li>
     `;
     
-    // Backtracking explanation
     document.getElementById('backtrackingExplanation').textContent = 
         `Algorithm explored ${result.steps.length} steps using backtracking search to find valid assignments.`;
     
-    // Solution explanation
     document.getElementById('solutionExplanation').textContent = 
         `Found valid combination with total cost ₹${result.totalCost}, remaining budget ₹${result.remainingBudget}.`;
 }
@@ -192,7 +182,7 @@ function displayAlgorithmSteps() {
         
         stepsHTML += `
             <div class="step-entry ${stepClass}">
-                ${step.message}
+                ${escapeHtml(step.message)}
                 ${step.currentTotal ? `<br>Current Total: ₹${step.currentTotal}` : ''}
             </div>
         `;
@@ -201,7 +191,7 @@ function displayAlgorithmSteps() {
     stepsDisplay.innerHTML = stepsHTML;
 }
 
-// Save current plan
+// Save current plan to Firestore
 async function savePlan() {
     if (!currentPlanResult || !currentPlanResult.success) {
         alert('No valid plan to save. Please run the planner first.');
@@ -215,38 +205,26 @@ async function savePlan() {
     }
     
     try {
-        // Create planner history entry
-        const { data: historyData, error: historyError } = await window.supabaseClient
-            .from('planner_history')
-            .insert([{
-                user_id: user.id,
-                budget: currentPlanResult.budget,
-                minimum_condition: currentPlanResult.minimumCondition,
-                total_cost: currentPlanResult.totalCost,
-                remaining_budget: currentPlanResult.remainingBudget
-            }])
-            .select()
-            .single();
-        
-        if (historyError) throw historyError;
-        
-        // Create planner history items
         const items = [];
         for (const [variable, resource] of Object.entries(currentPlanResult.solution)) {
             items.push({
-                history_id: historyData.id,
+                variable: variable,
                 resource_id: resource.id,
                 resource_title: resource.title,
                 price: resource.price,
                 condition: resource.condition
             });
         }
-        
-        const { error: itemsError } = await window.supabaseClient
-            .from('planner_history_items')
-            .insert(items);
-        
-        if (itemsError) throw itemsError;
+
+        await window.firebaseDb.collection('planner_history').add({
+            user_id: user.uid,
+            budget: currentPlanResult.budget,
+            minimum_condition: currentPlanResult.minimumCondition,
+            total_cost: currentPlanResult.totalCost,
+            remaining_budget: currentPlanResult.remainingBudget,
+            items: items,
+            created_at: firebase.firestore.FieldValue.serverTimestamp()
+        });
         
         alert('Plan saved successfully!');
         
