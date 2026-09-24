@@ -1,29 +1,46 @@
 // ============================================
 // LISTING CRUD MODULE (FIREBASE)
+// Storage-Free: Uses Base64 compression or Image URLs
 // ============================================
 
-// Upload image to Firebase Cloud Storage
-async function uploadImage(file, userId) {
-    if (!file) return null;
-    
-    if (!window.firebaseStorage) {
-        console.error('Firebase Storage not initialized');
-        return null;
-    }
-    
-    try {
-        const fileExt = file.name.split('.').pop();
-        const safeName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-        const storageRef = window.firebaseStorage.ref().child(`resource-images/${userId}/${safeName}`);
-        
-        const snapshot = await storageRef.put(file);
-        const downloadUrl = await snapshot.ref.getDownloadURL();
-        return downloadUrl;
-    } catch (error) {
-        console.error('Error uploading image to Firebase Storage:', error);
-        // Fallback: If Firebase Storage is not yet enabled on the project, alert or return null
-        return null;
-    }
+// Convert image file to optimized Base64 data URL (max 500px, 70% quality, ~30-50KB)
+function processImageFile(file) {
+    return new Promise((resolve) => {
+        if (!file) {
+            resolve(null);
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const maxDim = 500;
+                
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.onerror = () => resolve(null);
+            img.src = e.target.result;
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+    });
 }
 
 // Create new listing in Firestore
@@ -35,7 +52,7 @@ async function createListing(listingData, imageFile) {
     
     let imageUrl = null;
     if (imageFile) {
-        imageUrl = await uploadImage(imageFile, user.uid);
+        imageUrl = await processImageFile(imageFile);
     }
     
     const profile = await getUserProfile(user.uid);
@@ -83,7 +100,7 @@ async function updateListing(resourceId, listingData, imageFile) {
     
     let imageUrl = existingData.image_url;
     if (imageFile) {
-        const newUrl = await uploadImage(imageFile, user.uid);
+        const newUrl = await processImageFile(imageFile);
         if (newUrl) imageUrl = newUrl;
     }
     

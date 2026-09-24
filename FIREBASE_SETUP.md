@@ -1,6 +1,7 @@
-# CampusShare - Firebase Setup & Architecture Guide
+# CampusShare - Firebase Setup Guide
 
 This guide details the Firebase configuration for **CampusShare** on project `foai-53b5b`.
+The application uses **Firebase Authentication** and **Cloud Firestore** for all database storage and real-time messaging, with **no external Cloud Storage service required** (images are saved directly in Firestore).
 
 ---
 
@@ -9,7 +10,7 @@ This guide details the Firebase configuration for **CampusShare** on project `fo
 - **Project ID**: `foai-53b5b`
 - **Firestore Database**: Already active in `(default)` native mode (`asia-south2`).
 - **Sample Data**: Pre-seeded with academic textbooks (DBMS, Java), Calculators, Arduino kits, Multimeters, and Drawing tools.
-- **Frontend Integration**: Fully updated with Firebase Web SDK v10 (compat mode for vanilla JavaScript).
+- **Frontend Integration**: Fully updated with Firebase Web SDK v10 (Authentication & Firestore Database).
 
 ---
 
@@ -28,11 +29,6 @@ Open the [Firebase Console](https://console.firebase.google.com/project/foai-53b
 1. Go to **Build** → **Firestore Database**.
 2. Click the **Rules** tab at the top.
 3. Replace the contents with the rules from [`firestore.rules`](./firestore.rules) and click **Publish**.
-
-### 3. Enable Cloud Storage (For Listing Images)
-1. Go to **Build** → **Storage**.
-2. Click **Get Started**, choose **Start in production mode** (or test mode), keep the default location, and click **Done**.
-3. Under the **Rules** tab, paste the rules from [`storage.rules`](./storage.rules) and click **Publish**.
 
 ---
 
@@ -62,7 +58,7 @@ Document ID: auto-generated
 - `condition`: string (`New`, `Like New`, `Good`, `Fair`, `Poor`)
 - `availability`: string (`Available`, `Reserved`, `Sold`)
 - `pickup_location`: string
-- `image_url`: string (Storage download URL)
+- `image_url`: string (Image URL or optimized Base64 data URL)
 - `created_at`: timestamp
 - `updated_at`: timestamp
 

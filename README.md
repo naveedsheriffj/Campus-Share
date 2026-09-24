@@ -21,7 +21,7 @@ The main intelligent feature uses **CSP + Backtracking Search** to find the best
 ## 🛠 Technology Stack
 
 - **Frontend**: HTML, CSS, Vanilla JavaScript
-- **Backend/Database**: Google Firebase (Cloud Firestore, Authentication, Cloud Storage)
+- **Backend/Database**: Google Firebase (Cloud Firestore Database, Firebase Authentication)
 - **AI Algorithm**: CSP + Backtracking Search (implemented in JavaScript)
 
 ## 📁 Project Structure
@@ -50,7 +50,7 @@ campusshare/
 │   ├── firebase.js              # Firebase configuration & initialization
 │   ├── auth.js                  # Authentication logic (Firebase Auth)
 │   ├── marketplace.js           # Marketplace functionality (Cloud Firestore)
-│   ├── listing.js               # Listing CRUD & Cloud Storage operations
+│   ├── listing.js               # Listing CRUD operations
 │   ├── cspBacktracking.js       # CSP + Backtracking algorithm
 │   ├── planner.js               # Planner UI integration
 │   ├── history.js               # Planner history
@@ -59,7 +59,6 @@ campusshare/
 │   └── chat.js                  # Real-time messaging (Firestore onSnapshot)
 │
 ├── firestore.rules              # Firestore Security Rules
-├── storage.rules                # Cloud Storage Security Rules
 ├── FIREBASE_SETUP.md            # Firebase setup & configuration guide
 └── README.md
 ```
