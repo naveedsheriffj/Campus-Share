@@ -2,6 +2,13 @@
 // PURCHASE REQUESTS MODULE (FIREBASE)
 // ============================================
 
+function escapeHtml(text) {
+    if (typeof text !== 'string') return text || '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Create a purchase request
 async function createPurchaseRequest(resourceId, message, pickupLocation) {
     const user = await checkAuth();

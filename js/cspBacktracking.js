@@ -1,20 +1,22 @@
 // ============================================
 // CSP + INFERENCE & SEARCH ALGORITHMS (UNIT-III)
 // Features:
-// 1. Simple Backtracking (Baseline)
+// 1. Simple Backtracking (Baseline Standard)
 // 2. Backtracking with Forward Checking (Constraint Propagation)
 // 3. Backtracking with FC + MRV (Fail-First) + LCV (Least Constraining Value)
 // 4. Side-by-Side Algorithm Comparison Benchmarker
+// 5. Node Consistency (Unary Constraint Pre-filtering)
 // ============================================
 
 // Condition ranking for comparison
-const CONDITION_RANKING = {
+var CONDITION_RANKING = window.CONDITION_RANKING || {
     'New': 5,
     'Like New': 4,
     'Good': 3,
     'Fair': 2,
     'Poor': 1
 };
+window.CONDITION_RANKING = CONDITION_RANKING;
 
 function getConditionRank(condition) {
     return CONDITION_RANKING[condition] || 0;
@@ -45,6 +47,54 @@ function cloneDomains(domains) {
     return clone;
 }
 
+// Check validity of assigning variable = value given current assignment and constraints
+function isValidAssignment(currentAssignment, variable, value, budget, minimumCondition) {
+    // Budget Constraint
+    const cost = calculateTotalCost(currentAssignment) + (value.price || 0);
+    if (cost > budget) {
+        return { valid: false, reason: `Budget exceeded: ₹${cost} > ₹${budget}` };
+    }
+    // Condition Constraint
+    if (!meetsConditionRequirement(value.condition, minimumCondition)) {
+        return { valid: false, reason: `Condition failed: ${value.condition} < ${minimumCondition}` };
+    }
+    // Availability Constraint
+    if (value.availability !== 'Available') {
+        return { valid: false, reason: `Resource status: ${value.availability}` };
+    }
+    // Uniqueness / AllDifferent Constraint (no duplicate resources)
+    for (const assigned of Object.values(currentAssignment)) {
+        if (assigned.id === value.id) {
+            return { valid: false, reason: `Duplicate resource: ${value.title}` };
+        }
+    }
+    return { valid: true };
+}
+
+// ============================================
+// NODE CONSISTENCY (UNARY CONSTRAINT PRE-FILTERING)
+// ============================================
+
+function applyNodeConsistency(domains, budget, minimumCondition) {
+    const filtered = {};
+    let prunedCount = 0;
+    for (const [variable, list] of Object.entries(domains)) {
+        filtered[variable] = [];
+        for (const item of list) {
+            const conditionOk = meetsConditionRequirement(item.condition, minimumCondition);
+            const availabilityOk = (item.availability === 'Available');
+            const priceOk = (item.price || 0) <= budget;
+
+            if (conditionOk && availabilityOk && priceOk) {
+                filtered[variable].push(item);
+            } else {
+                prunedCount++;
+            }
+        }
+    }
+    return { filteredDomains: filtered, prunedCount };
+}
+
 // ============================================
 // 1. SIMPLE BACKTRACKING (BASELINE)
 // ============================================
@@ -55,29 +105,6 @@ function solveSimpleBacktracking(variables, initialDomains, budget, minimumCondi
     const assignment = {};
     let nodesExplored = 0;
     let backtracks = 0;
-
-    function isValid(currentAssignment, variable, value) {
-        // Budget
-        let cost = calculateTotalCost(currentAssignment) + (value.price || 0);
-        if (cost > budget) {
-            return { valid: false, reason: `Budget exceeded: ₹${cost} > ₹${budget}` };
-        }
-        // Condition
-        if (!meetsConditionRequirement(value.condition, minimumCondition)) {
-            return { valid: false, reason: `Condition failed: ${value.condition} < ${minimumCondition}` };
-        }
-        // Availability
-        if (value.availability !== 'Available') {
-            return { valid: false, reason: `Resource status: ${value.availability}` };
-        }
-        // Duplicate resource
-        for (const assigned of Object.values(currentAssignment)) {
-            if (assigned.id === value.id) {
-                return { valid: false, reason: `Duplicate resource: ${value.title}` };
-            }
-        }
-        return { valid: true };
-    }
 
     function search() {
         if (Object.keys(assignment).length === variables.length) {
@@ -104,7 +131,7 @@ function solveSimpleBacktracking(variables, initialDomains, budget, minimumCondi
                 message: `Trying ${unassignedVar} = ${value.title} (₹${value.price}, ${value.condition})`
             });
 
-            const check = isValid(assignment, unassignedVar, value);
+            const check = isValidAssignment(assignment, unassignedVar, value, budget, minimumCondition);
             if (check.valid) {
                 assignment[unassignedVar] = value;
                 steps.push({
@@ -170,8 +197,9 @@ function solveForwardChecking(variables, initialDomains, budget, minimumConditio
     let nodesExplored = 0;
     let backtracks = 0;
     let prunings = 0;
+    const currentDomains = cloneDomains(initialDomains);
 
-    function forwardCheck(varJustAssigned, valJustAssigned, currentDomains) {
+    function forwardCheck(varJustAssigned, valJustAssigned) {
         const remainingBudget = budget - calculateTotalCost(assignment);
         const pruned = {};
 
@@ -181,7 +209,6 @@ function solveForwardChecking(variables, initialDomains, budget, minimumConditio
                 const newDomain = [];
 
                 for (const item of currentDomains[otherVar]) {
-                    // Check if item exceeds remaining budget or has duplicate ID or fails condition
                     const exceedsBudget = (item.price || 0) > remainingBudget;
                     const isDuplicate = item.id === valJustAssigned.id;
                     const conditionFails = !meetsConditionRequirement(item.condition, minimumCondition);
@@ -205,7 +232,7 @@ function solveForwardChecking(variables, initialDomains, budget, minimumConditio
                     });
                 }
 
-                // If domain wiped out, fail immediately!
+                // If domain wiped out, fail immediately
                 if (currentDomains[otherVar].length === 0) {
                     steps.push({
                         type: 'fc_wipeout',
@@ -220,19 +247,19 @@ function solveForwardChecking(variables, initialDomains, budget, minimumConditio
         return { ok: true, pruned };
     }
 
-    function restorePruned(currentDomains, pruned) {
+    function restorePruned(pruned) {
         for (const [varName, removedItems] of Object.entries(pruned)) {
             currentDomains[varName].push(...removedItems);
         }
     }
 
-    function search(domains) {
+    function search() {
         if (Object.keys(assignment).length === variables.length) {
             return true;
         }
 
         const unassignedVar = variables.find(v => !(v in assignment));
-        const domain = [...domains[unassignedVar]];
+        const domain = [...currentDomains[unassignedVar]];
 
         steps.push({
             type: 'select_variable',
@@ -243,26 +270,46 @@ function solveForwardChecking(variables, initialDomains, budget, minimumConditio
 
         for (const value of domain) {
             nodesExplored++;
-            assignment[unassignedVar] = value;
-
             steps.push({
                 type: 'try_value',
                 variable: unassignedVar,
                 value: value.title,
-                message: `[FC] Assigned ${unassignedVar} = ${value.title} (₹${value.price})`
+                message: `Trying ${unassignedVar} = ${value.title} (₹${value.price})`
+            });
+
+            // Validate assignment
+            const check = isValidAssignment(assignment, unassignedVar, value, budget, minimumCondition);
+            if (!check.valid) {
+                steps.push({
+                    type: 'invalid',
+                    variable: unassignedVar,
+                    value: value.title,
+                    reason: check.reason,
+                    message: `✗ Invalid: ${check.reason}`
+                });
+                continue;
+            }
+
+            assignment[unassignedVar] = value;
+            steps.push({
+                type: 'valid',
+                variable: unassignedVar,
+                value: value.title,
+                message: `✓ [FC] Assigned ${unassignedVar} = ${value.title} (Subtotal: ₹${calculateTotalCost(assignment)})`,
+                currentTotal: calculateTotalCost(assignment)
             });
 
             // Perform Forward Checking inference on remaining variables
-            const fcResult = forwardCheck(unassignedVar, value, domains);
+            const fcResult = forwardCheck(unassignedVar, value);
 
             if (fcResult.ok) {
-                if (search(domains)) {
+                if (search()) {
                     return true;
                 }
             }
 
             // Restore domains on backtrack
-            restorePruned(domains, fcResult.pruned);
+            restorePruned(fcResult.pruned);
             backtracks++;
             steps.push({
                 type: 'backtrack',
@@ -276,8 +323,7 @@ function solveForwardChecking(variables, initialDomains, budget, minimumConditio
         return false;
     }
 
-    const currentDomains = cloneDomains(initialDomains);
-    const success = search(currentDomains);
+    const success = search();
     const duration = performance.now() - startTime;
 
     return {
@@ -305,15 +351,16 @@ function solveForwardCheckingMRVLCV(variables, initialDomains, budget, minimumCo
     let nodesExplored = 0;
     let backtracks = 0;
     let prunings = 0;
+    const currentDomains = cloneDomains(initialDomains);
 
     // MRV (Minimum Remaining Values): Pick unassigned variable with smallest domain
-    function selectMRVVariable(domains) {
+    function selectMRVVariable() {
         let bestVar = null;
         let minDomainSize = Infinity;
 
         for (const v of variables) {
             if (!(v in assignment)) {
-                const domainSize = domains[v].length;
+                const domainSize = currentDomains[v].length;
                 if (domainSize < minDomainSize) {
                     minDomainSize = domainSize;
                     bestVar = v;
@@ -324,11 +371,11 @@ function solveForwardCheckingMRVLCV(variables, initialDomains, budget, minimumCo
     }
 
     // LCV (Least Constraining Value): Sort values by lowest price (preserves maximum remaining budget for peers)
-    function orderValuesLCV(variable, domain) {
+    function orderValuesLCV(domain) {
         return [...domain].sort((a, b) => (a.price || 0) - (b.price || 0));
     }
 
-    function forwardCheck(varJustAssigned, valJustAssigned, currentDomains) {
+    function forwardCheck(varJustAssigned, valJustAssigned) {
         const remainingBudget = budget - calculateTotalCost(assignment);
         const pruned = {};
 
@@ -375,20 +422,20 @@ function solveForwardCheckingMRVLCV(variables, initialDomains, budget, minimumCo
         return { ok: true, pruned };
     }
 
-    function restorePruned(currentDomains, pruned) {
+    function restorePruned(pruned) {
         for (const [varName, removedItems] of Object.entries(pruned)) {
             currentDomains[varName].push(...removedItems);
         }
     }
 
-    function search(domains) {
+    function search() {
         if (Object.keys(assignment).length === variables.length) {
             return true;
         }
 
         // Apply MRV Heuristic
-        const { variable: mrvVar, size } = selectMRVVariable(domains);
-        if (!mrvVar) return true;
+        const { variable: mrvVar, size } = selectMRVVariable();
+        if (!mrvVar || size === 0) return false;
 
         steps.push({
             type: 'select_variable',
@@ -398,28 +445,48 @@ function solveForwardCheckingMRVLCV(variables, initialDomains, budget, minimumCo
         });
 
         // Apply LCV Heuristic (least constraining values first)
-        const orderedDomain = orderValuesLCV(mrvVar, domains[mrvVar]);
+        const orderedDomain = orderValuesLCV(currentDomains[mrvVar]);
 
         for (const value of orderedDomain) {
             nodesExplored++;
-            assignment[mrvVar] = value;
-
             steps.push({
                 type: 'try_value',
                 variable: mrvVar,
                 value: value.title,
-                message: `[LCV Choice] Trying ${mrvVar} = ${value.title} (Lowest Impact: ₹${value.price})`
+                message: `[LCV Choice] Trying ${mrvVar} = ${value.title} (Price: ₹${value.price})`
             });
 
-            const fcResult = forwardCheck(mrvVar, value, domains);
+            // Validate assignment
+            const check = isValidAssignment(assignment, mrvVar, value, budget, minimumCondition);
+            if (!check.valid) {
+                steps.push({
+                    type: 'invalid',
+                    variable: mrvVar,
+                    value: value.title,
+                    reason: check.reason,
+                    message: `✗ Invalid: ${check.reason}`
+                });
+                continue;
+            }
+
+            assignment[mrvVar] = value;
+            steps.push({
+                type: 'valid',
+                variable: mrvVar,
+                value: value.title,
+                message: `✓ [Assigned] ${mrvVar} = ${value.title} (Subtotal: ₹${calculateTotalCost(assignment)})`,
+                currentTotal: calculateTotalCost(assignment)
+            });
+
+            const fcResult = forwardCheck(mrvVar, value);
 
             if (fcResult.ok) {
-                if (search(domains)) {
+                if (search()) {
                     return true;
                 }
             }
 
-            restorePruned(domains, fcResult.pruned);
+            restorePruned(fcResult.pruned);
             backtracks++;
             steps.push({
                 type: 'backtrack',
@@ -433,8 +500,7 @@ function solveForwardCheckingMRVLCV(variables, initialDomains, budget, minimumCo
         return false;
     }
 
-    const currentDomains = cloneDomains(initialDomains);
-    const success = search(currentDomains);
+    const success = search();
     const duration = performance.now() - startTime;
 
     return {
@@ -500,23 +566,50 @@ function runAllAlgorithmsBenchmark(variables, domains, budget, minimumCondition)
 // DOMAIN GENERATION
 // ============================================
 
+const ACRONYM_MAP = {
+    'dbms': ['database', 'dbms'],
+    'database': ['dbms', 'database'],
+    'calc': ['calculator', 'calc'],
+    'calculator': ['calculator', 'calc'],
+    'os': ['operating system', 'os'],
+    'cn': ['computer network', 'computer networks', 'cn'],
+    'ai': ['artificial intelligence', 'ai'],
+    'foai': ['foundations of artificial intelligence', 'foai', 'ai'],
+    'dsa': ['data structures', 'algorithms', 'dsa']
+};
+
 function generateDomains(requiredResources, availableResources) {
+    const stopWords = new Set(['a', 'an', 'the', 'in', 'on', 'for', 'of', 'and', 'or', 'with', 'to', 'at', 'is', 'item', 'items']);
     const domains = {};
     
     for (const requiredResource of requiredResources) {
-        const requiredWords = requiredResource.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+        const trimmedReq = requiredResource.trim();
+        const lowerReq = trimmedReq.toLowerCase();
+        const reqWords = lowerReq.split(/\s+/).filter(w => w.length > 0 && !stopWords.has(w));
         
         const matchingResources = availableResources.filter(resource => {
             const title = (resource.title || '').toLowerCase();
             const subject = (resource.subject || '').toLowerCase();
             const category = (resource.category || '').toLowerCase();
+            const desc = (resource.description || '').toLowerCase();
+            const fullText = `${title} ${subject} ${category} ${desc}`;
             
-            // Match whole title or any significant keyword
-            return title.includes(requiredResource.toLowerCase()) ||
-                   requiredWords.some(w => title.includes(w) || subject.includes(w) || category.includes(w));
+            // 1. Direct full-phrase substring match
+            if (fullText.includes(lowerReq)) return true;
+            
+            // 2. All significant words match (allowing acronym expansion)
+            if (reqWords.length > 0) {
+                const allWordsMatch = reqWords.every(word => {
+                    const variants = ACRONYM_MAP[word] || [word];
+                    return variants.some(v => fullText.includes(v));
+                });
+                if (allWordsMatch) return true;
+            }
+            
+            return false;
         });
         
-        domains[requiredResource] = matchingResources;
+        domains[trimmedReq] = matchingResources;
     }
     
     return domains;
@@ -526,7 +619,7 @@ function generateDomains(requiredResources, availableResources) {
 // MAIN UNIFIED SOLVER
 // ============================================
 
-function solveResourcePlanningProblem(requiredResources, budget, minimumCondition, availableResources, mode = 'benchmark') {
+function solveResourcePlanningProblem(requiredResources, budget, minimumCondition, availableResources, mode = 'mrv') {
     const normalizedRequirements = requiredResources
         .map(r => r.trim())
         .filter(r => r.length > 0);
@@ -539,30 +632,60 @@ function solveResourcePlanningProblem(requiredResources, budget, minimumConditio
         return { success: false, error: 'No available resources in marketplace' };
     }
     
-    const domains = generateDomains(normalizedRequirements, availableResources);
+    const rawDomains = generateDomains(normalizedRequirements, availableResources);
     
+    // Check if any variable has 0 matching resources in the database
     for (const variable of normalizedRequirements) {
-        if (!domains[variable] || domains[variable].length === 0) {
+        if (!rawDomains[variable] || rawDomains[variable].length === 0) {
             return {
                 success: false,
-                error: `No matching resources found for: "${variable}"`
+                error: `No matching resources found in marketplace for: "${variable}"`,
+                variables: normalizedRequirements,
+                domains: rawDomains,
+                budget,
+                minimumCondition
+            };
+        }
+    }
+
+    // Apply Node Consistency (Unary Constraints pre-filtering)
+    const { filteredDomains, prunedCount } = applyNodeConsistency(rawDomains, budget, minimumCondition);
+
+    // Check if any variable had its domain wiped out by unary constraints
+    for (const variable of normalizedRequirements) {
+        if (filteredDomains[variable].length === 0) {
+            let benchmark = null;
+            if (mode === 'benchmark') {
+                benchmark = runAllAlgorithmsBenchmark(normalizedRequirements, rawDomains, budget, minimumCondition);
+            }
+            return {
+                success: false,
+                error: `No items matching "${variable}" satisfy the minimum condition (≥ ${minimumCondition}) and budget limit (≤ ₹${budget}).`,
+                variables: normalizedRequirements,
+                domains: rawDomains,
+                budget,
+                minimumCondition,
+                benchmark
             };
         }
     }
     
-    // Execute based on selected mode
+    // Run all algorithms to compare and select optimal result with benchmark data
+    const benchmark = runAllAlgorithmsBenchmark(normalizedRequirements, filteredDomains, budget, minimumCondition);
     let result;
     if (mode === 'simple') {
-        result = solveSimpleBacktracking(normalizedRequirements, domains, budget, minimumCondition);
+        result = { ...benchmark.baseline };
     } else if (mode === 'fc') {
-        result = solveForwardChecking(normalizedRequirements, domains, budget, minimumCondition);
-    } else if (mode === 'mrv') {
-        result = solveForwardCheckingMRVLCV(normalizedRequirements, domains, budget, minimumCondition);
+        result = { ...benchmark.forwardChecking };
     } else {
-        // Benchmark mode (Runs all 3 and picks optimal)
-        const benchmark = runAllAlgorithmsBenchmark(normalizedRequirements, domains, budget, minimumCondition);
-        result = benchmark.mrvLcvFC.success ? benchmark.mrvLcvFC : (benchmark.forwardChecking.success ? benchmark.forwardChecking : benchmark.baseline);
-        result.benchmark = benchmark;
+        // Default: MRV + LCV + Forward Checking (Unit-III Most Efficient Algorithm)
+        result = benchmark.mrvLcvFC.success 
+            ? { ...benchmark.mrvLcvFC } 
+            : (benchmark.forwardChecking.success ? { ...benchmark.forwardChecking } : { ...benchmark.baseline });
+    }
+    result.benchmark = benchmark;
+    if (!result.success) {
+        result.error = `Could not find a valid combination within your budget of ₹${budget}. Total minimum cost exceeds your budget or required conditions cannot be met.`;
     }
     
     return {
@@ -570,7 +693,7 @@ function solveResourcePlanningProblem(requiredResources, budget, minimumConditio
         budget,
         minimumCondition,
         variables: normalizedRequirements,
-        domains
+        domains: filteredDomains
     };
 }
 
@@ -582,6 +705,7 @@ window.CSPSolver = {
     solveForwardCheckingMRVLCV,
     runAllAlgorithmsBenchmark,
     generateDomains,
+    applyNodeConsistency,
     getConditionRank,
     meetsConditionRequirement
 };

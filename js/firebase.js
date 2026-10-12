@@ -19,24 +19,46 @@ window.firebaseAuth = null;
 window.firebaseDb = null;
 window.COLLEGE_EMAIL_DOMAIN = COLLEGE_EMAIL_DOMAIN;
 
+// Global XSS sanitization helper
+window.escapeHtml = function(text) {
+    if (typeof text !== 'string') return text || '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+};
+
+window.firebaseConfig = firebaseConfig;
+window.getFirebaseConfig = function() { return firebaseConfig; };
+
 function initFirebase() {
+    if (window.firebaseDb) return; // Already initialized
     if (typeof firebase !== 'undefined') {
-        if (!firebase.apps.length) {
-            window.firebaseApp = firebase.initializeApp(firebaseConfig);
-        } else {
-            window.firebaseApp = firebase.app();
+        try {
+            if (!firebase.apps.length) {
+                window.firebaseApp = firebase.initializeApp(firebaseConfig);
+            } else {
+                window.firebaseApp = firebase.app();
+            }
+            window.firebaseAuth = firebase.auth();
+            window.firebaseDb = firebase.firestore();
+            console.log('Firebase initialized successfully for project:', firebaseConfig.projectId);
+        } catch (err) {
+            console.error('Error initializing Firebase:', err);
         }
-        window.firebaseAuth = firebase.auth();
-        window.firebaseDb = firebase.firestore();
-        console.log('Firebase initialized successfully for project:', firebaseConfig.projectId);
     } else {
-        console.error('Firebase SDK not loaded. Please verify the CDN script tags.');
+        console.warn('Firebase SDK not yet loaded. Waiting for script tags.');
     }
 }
 
-// Initialize when DOM is ready
+// Initialize immediately if Firebase SDK is present in window
+if (typeof firebase !== 'undefined') {
+    initFirebase();
+}
+
+// Initialize when DOM is ready as fallback
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initFirebase);
 } else {
     initFirebase();
 }
+

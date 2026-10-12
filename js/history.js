@@ -2,6 +2,13 @@
 // PLANNER HISTORY MODULE (FIREBASE)
 // ============================================
 
+function escapeHtml(text) {
+    if (typeof text !== 'string') return text || '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Fetch planner history for current user from Firestore
 async function fetchPlannerHistory() {
     const user = await checkAuth();

@@ -338,10 +338,9 @@ function initAuth() {
         btn.addEventListener('click', handleLogout);
     });
     
-    // Protected pages
-    const protectedPages = ['dashboard.html', 'marketplace.html', 'resource-details.html', 
-                          'create-listing.html', 'planner.html', 'history.html', 'profile.html',
-                          'seller-requests.html', 'my-requests.html', 'chat.html'];
+    // Protected pages requiring sign-in
+    const protectedPages = ['dashboard.html', 'create-listing.html', 'history.html', 
+                          'profile.html', 'seller-requests.html', 'my-requests.html', 'chat.html'];
     
     const currentPage = window.location.pathname.split('/').pop();
     if (protectedPages.includes(currentPage)) {

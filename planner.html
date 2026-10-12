@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Resource Planner - CampusShare</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=3.3">
 </head>
 <body>
     <div class="app-container">
@@ -26,24 +29,33 @@
 
         <main class="main-content">
             <div class="planner-header">
+                <span style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.3rem 0.85rem;border-radius:9999px;background:#eef2ff;color:#4f46e5;font-weight:700;font-size:0.8rem;margin-bottom:0.75rem;border:1px solid #c7d2fe;box-shadow:0 1px 2px rgba(79,70,229,0.06);">⚡ AI Constraint Satisfaction Engine</span>
                 <h2>Smart Resource Planner</h2>
-                <p class="planner-subtitle">AI-powered resource combination finder using CSP + Backtracking Search</p>
+                <p class="planner-subtitle">Find the optimal combination of textbooks, lab tools, and academic supplies matching your budget and condition criteria.</p>
             </div>
 
             <div class="planner-sections">
                 <div class="planner-input-section">
-                    <h3>Enter Your Requirements</h3>
+                    <h3>📋 Enter Your Requirements</h3>
                     <form id="plannerForm" class="planner-form">
                         <div class="form-group">
                             <label for="requiredResources">Required Resources (one per line) *</label>
-                            <textarea id="requiredResources" name="requiredResources" required rows="5" placeholder="DBMS Book&#10;Java Book&#10;Calculator"></textarea>
-                            <small class="form-hint">Enter each resource on a new line</small>
+                            <textarea id="requiredResources" name="requiredResources" required rows="4" placeholder="DBMS Book&#10;Java Book&#10;Calculator">DBMS Book&#10;Java Book&#10;Calculator</textarea>
+                            <small class="form-hint">Enter each resource on a new line or click tags below to add:</small>
+                            <div class="planner-quick-tags" style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem;">
+                                <button type="button" class="btn btn-outline btn-sm" onclick="addPlannerChip('DBMS Book')">+ DBMS Book</button>
+                                <button type="button" class="btn btn-outline btn-sm" onclick="addPlannerChip('Java Book')">+ Java Book</button>
+                                <button type="button" class="btn btn-outline btn-sm" onclick="addPlannerChip('Calculator')">+ Calculator</button>
+                                <button type="button" class="btn btn-outline btn-sm" onclick="addPlannerChip('Engineering Drawing Set')">+ Drawing Set</button>
+                                <button type="button" class="btn btn-outline btn-sm" onclick="addPlannerChip('Digital Multimeter')">+ Multimeter</button>
+                                <button type="button" class="btn btn-outline btn-sm" onclick="addPlannerChip('Arduino Uno Starter Kit')">+ Arduino Kit</button>
+                            </div>
                         </div>
                         
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="budget">Budget (₹) *</label>
-                                <input type="number" id="budget" name="budget" required min="0" placeholder="1500">
+                                <input type="number" id="budget" name="budget" required min="0" value="1500" placeholder="1500">
                             </div>
                             
                             <div class="form-group">
@@ -52,34 +64,24 @@
                                     <option value="">Select Condition</option>
                                     <option value="New">New</option>
                                     <option value="Like New">Like New</option>
-                                    <option value="Good">Good</option>
+                                    <option value="Good" selected>Good</option>
                                     <option value="Fair">Fair</option>
                                     <option value="Poor">Poor</option>
                                 </select>
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="algorithmMode">Unit-III Search & Inference Algorithm *</label>
-                            <select id="algorithmMode" name="algorithmMode" required>
-                                <option value="benchmark" selected>🔬 Benchmark Mode (Side-by-Side: Simple BT vs FC vs FC+MRV+LCV)</option>
-                                <option value="mrv">⚡ Forward Checking + MRV (Fail-First) + LCV (Optimized)</option>
-                                <option value="fc">🛡️ Forward Checking Only (Constraint Propagation)</option>
-                                <option value="simple">🔄 Simple Backtracking (Baseline Standard)</option>
-                            </select>
-                            <small class="form-hint">Compare search nodes, backtrack counts, and domain pruning across algorithms</small>
+                        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                            <button type="submit" class="btn btn-primary btn-large" style="flex: 1; min-width: 220px;">Find Best Combination</button>
+                            <button type="button" class="btn btn-secondary btn-large" onclick="fillSamplePlan()" title="One-click demo sample">⚡ Fill Sample Requirements</button>
                         </div>
-                        
-                        <button type="submit" class="btn btn-primary btn-large">Find Best Combination</button>
                     </form>
                 </div>
 
                 <div id="plannerResults" class="planner-results-section" style="display: none;">
-                    <div id="benchmarkDisplay" class="benchmark-container" style="display: none;"></div>
-
                     <div class="results-header">
-                        <h3>Best Combination Found</h3>
-                        <div class="algorithm-badge">Algorithm: CSP + Backtracking Search</div>
+                        <h3>🎯 Best Combination Found</h3>
+                        <div class="algorithm-badge"><span>✓</span> Optimal AI Solution</div>
                     </div>
                     
                     <div id="solutionDisplay" class="solution-display">
@@ -87,9 +89,52 @@
                     </div>
                     
                     <div class="results-actions">
-                        <button id="savePlanBtn" class="btn btn-primary">Save Plan</button>
-                        <button id="viewStepsBtn" class="btn btn-secondary">View Algorithm Steps</button>
+                        <button id="savePlanBtn" class="btn btn-primary btn-large"><span>💾</span> Save Plan</button>
                     </div>
+
+                    <!-- Optional Technical Details (Collapsed by default so it doesn't clutter the main combination view) -->
+                    <details class="academic-details" style="margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 1.25rem;">
+                        <summary style="cursor: pointer; color: #64748b; font-weight: 500; font-size: 0.9rem;">
+                            🔬 Technical AI Details (FOAI Unit-III Benchmark & Backtracking Steps)
+                        </summary>
+                        <div style="margin-top: 1rem;">
+                            <div id="benchmarkDisplay" class="benchmark-container"></div>
+
+                            <div style="margin-top: 1rem; margin-bottom: 1rem;">
+                                <button id="viewStepsBtn" class="btn btn-outline btn-sm">View Algorithm Step-by-Step Log</button>
+                            </div>
+
+                            <div id="aiExplanation" class="ai-explanation-section">
+                                <h3>How the AI Found This Solution</h3>
+                                <div class="ai-flow">
+                                    <div class="flow-step">
+                                        <h4>Variables</h4>
+                                        <p id="variablesExplanation"></p>
+                                    </div>
+                                    <div class="flow-arrow">↓</div>
+                                    <div class="flow-step">
+                                        <h4>Domains</h4>
+                                        <p id="domainsExplanation"></p>
+                                    </div>
+                                    <div class="flow-arrow">↓</div>
+                                    <div class="flow-step">
+                                        <h4>Constraints</h4>
+                                        <ul id="constraintsExplanation"></ul>
+                                    </div>
+                                    <div class="flow-arrow">↓</div>
+                                    <div class="flow-step">
+                                        <h4>Backtracking</h4>
+                                        <p id="backtrackingExplanation"></p>
+                                    </div>
+                                    <div class="flow-arrow">↓</div>
+                                    <div class="flow-step flow-step-success">
+                                        <h4>Valid Solution</h4>
+                                        <p id="solutionExplanation"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
                 </div>
 
                 <div id="algorithmSteps" class="algorithm-steps-section" style="display: none;">
@@ -102,36 +147,6 @@
                         <!-- Algorithm steps will be displayed here -->
                     </div>
                 </div>
-
-                <div id="aiExplanation" class="ai-explanation-section" style="display: none;">
-                    <h3>How the AI Found This Solution</h3>
-                    <div class="ai-flow">
-                        <div class="flow-step">
-                            <h4>Variables</h4>
-                            <p id="variablesExplanation"></p>
-                        </div>
-                        <div class="flow-arrow">↓</div>
-                        <div class="flow-step">
-                            <h4>Domains</h4>
-                            <p id="domainsExplanation"></p>
-                        </div>
-                        <div class="flow-arrow">↓</div>
-                        <div class="flow-step">
-                            <h4>Constraints</h4>
-                            <ul id="constraintsExplanation"></ul>
-                        </div>
-                        <div class="flow-arrow">↓</div>
-                        <div class="flow-step">
-                            <h4>Backtracking</h4>
-                            <p id="backtrackingExplanation"></p>
-                        </div>
-                        <div class="flow-arrow">↓</div>
-                        <div class="flow-step flow-step-success">
-                            <h4>Valid Solution</h4>
-                            <p id="solutionExplanation"></p>
-                        </div>
-                    </div>
-                </div>
             </div>
         </main>
     </div>
@@ -140,10 +155,10 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <script src="js/firebase.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/marketplace.js"></script>
-    <script src="js/cspBacktracking.js"></script>
-    <script src="js/planner.js"></script>
+    <script src="js/firebase.js?v=3.3"></script>
+    <script src="js/auth.js?v=3.3"></script>
+    <script src="js/marketplace.js?v=3.3"></script>
+    <script src="js/cspBacktracking.js?v=3.3"></script>
+    <script src="js/planner.js?v=3.3"></script>
 </body>
 </html>

@@ -8,20 +8,37 @@ let currentPlanRequirements = null;
 
 // Handle planner form submission
 async function handlePlannerSubmit(event) {
-    event.preventDefault();
+    if (event && event.preventDefault) {
+        event.preventDefault();
+    }
     
-    const requiredResourcesText = document.getElementById('requiredResources').value;
-    const budget = parseFloat(document.getElementById('budget').value);
-    const minimumCondition = document.getElementById('minimumCondition').value;
-    const mode = document.getElementById('algorithmMode')?.value || 'benchmark';
-    
+    const requiredResourcesText = (document.getElementById('requiredResources')?.value || '').trim();
+    const budgetRaw = document.getElementById('budget')?.value;
+    const budget = parseFloat(budgetRaw);
+    const minimumCondition = document.getElementById('minimumCondition')?.value;
+    const mode = 'mrv'; // Unit-III Best Algorithm: Forward Checking with MRV & LCV
+
+    // Flexible parsing: handles newlines, commas, bullet points (- , * , 1. )
     const requiredResources = requiredResourcesText
-        .split('\n')
-        .map(r => r.trim())
+        .split(/[\n,]+/)
+        .map(r => r.replace(/^[-*•\d.)\s]+/, '').trim())
         .filter(r => r.length > 0);
     
     if (requiredResources.length === 0) {
-        alert('Please enter at least one required resource.');
+        alert('Please enter at least one required resource (e.g., DBMS Book, Java Book, Calculator).');
+        document.getElementById('requiredResources')?.focus();
+        return;
+    }
+
+    if (isNaN(budget) || budget <= 0) {
+        alert('Please enter a valid budget amount in ₹ (e.g., 1500).');
+        document.getElementById('budget')?.focus();
+        return;
+    }
+
+    if (!minimumCondition) {
+        alert('Please select a minimum acceptable condition.');
+        document.getElementById('minimumCondition')?.focus();
         return;
     }
     
@@ -31,28 +48,95 @@ async function handlePlannerSubmit(event) {
         minimumCondition,
         mode
     };
-    
-    // Fetch available resources from Firestore
-    const availableResources = await fetchResources();
-    
-    if (availableResources.length === 0) {
-        alert('No resources available in the marketplace.');
-        return;
+
+    const submitBtn = document.querySelector('#plannerForm button[type="submit"]');
+    const originalBtnText = submitBtn ? submitBtn.innerHTML : 'Find Best Combination';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '⚡ Finding Best Combination (Running AI Engine)...';
     }
     
-    // Solve CSP using our custom algorithm / benchmark
-    const result = window.CSPSolver.solveResourcePlanningProblem(
-        requiredResources,
-        budget,
-        minimumCondition,
-        availableResources,
-        mode
-    );
-    
-    currentPlanResult = result;
-    
-    displayPlannerResults(result);
-    displayAIExplanation(result);
+    try {
+        // Fetch available resources from Firestore (with automatic REST & offline fallback)
+        const availableResources = await fetchResources();
+        
+        if (!availableResources || availableResources.length === 0) {
+            const shouldSeed = confirm('There are currently 0 available resources in the database.\n\nWould you like to seed sample academic resources (DBMS Book, Java Book, Calculator, Drawing Set, etc.) into your Firestore database now to run the planner?');
+            if (shouldSeed && typeof window.seedSampleResourcesToDatabase === 'function') {
+                await window.seedSampleResourcesToDatabase();
+            }
+            return;
+        }
+        
+        if (!window.CSPSolver || typeof window.CSPSolver.solveResourcePlanningProblem !== 'function') {
+            throw new Error('AI CSP Solver engine not loaded. Please refresh the page.');
+        }
+
+        // Solve CSP using our custom algorithm / benchmark
+        const result = window.CSPSolver.solveResourcePlanningProblem(
+            requiredResources,
+            budget,
+            minimumCondition,
+            availableResources,
+            mode
+        );
+        
+        currentPlanResult = result;
+        
+        displayPlannerResults(result);
+        displayAIExplanation(result);
+
+        // Smoothly scroll down to results section so the user immediately sees the output
+        const resultsSection = document.getElementById('plannerResults');
+        if (resultsSection) {
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    } catch (err) {
+        console.error('Error in handlePlannerSubmit:', err);
+        alert('Error finding combination: ' + (err.message || 'Unknown error occurred.'));
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
+    }
+}
+
+// Helper: Add resource chip to the requirements textarea
+window.addPlannerChip = function(resourceName) {
+    const textarea = document.getElementById('requiredResources');
+    if (!textarea) return;
+    const current = textarea.value.trim();
+    const lines = current ? current.split('\n').map(l => l.trim()).filter(Boolean) : [];
+    if (!lines.includes(resourceName)) {
+        lines.push(resourceName);
+        textarea.value = lines.join('\n');
+    }
+    textarea.focus();
+};
+
+// Helper: Quick-fill sample requirements for fast one-click testing
+window.fillSamplePlan = function() {
+    const textarea = document.getElementById('requiredResources');
+    const budgetInput = document.getElementById('budget');
+    const conditionSelect = document.getElementById('minimumCondition');
+
+    if (textarea) textarea.value = "DBMS Book\nJava Book\nCalculator";
+    if (budgetInput) budgetInput.value = "1500";
+    if (conditionSelect) conditionSelect.value = "Good";
+
+    // Auto submit form
+    const form = document.getElementById('plannerForm');
+    if (form) {
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+};
+
+function escapeHtml(text) {
+    if (typeof text !== 'string') return text || '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Display planner results and comparison table
@@ -60,28 +144,35 @@ function displayPlannerResults(result) {
     const resultsSection = document.getElementById('plannerResults');
     const solutionDisplay = document.getElementById('solutionDisplay');
     const benchmarkContainer = document.getElementById('benchmarkDisplay');
-    
-    if (!result.success) {
-        resultsSection.style.display = 'block';
-        solutionDisplay.innerHTML = `
-            <div class="error-message" style="text-align: center; padding: 2rem;">
-                <h3>No Solution Found</h3>
-                <p>${result.error || 'Could not find a valid combination within your constraints.'}</p>
-                <p>Try increasing your budget or lowering your minimum condition requirement.</p>
-            </div>
-        `;
-        if (benchmarkContainer) benchmarkContainer.style.display = 'none';
-        return;
-    }
+    const savePlanBtn = document.getElementById('savePlanBtn');
+    const viewStepsBtn = document.getElementById('viewStepsBtn');
     
     resultsSection.style.display = 'block';
     
-    // Render Benchmark Comparison Table if available
+    // Render Benchmark Comparison Table whenever benchmark data exists
     if (result.benchmark && benchmarkContainer) {
         renderBenchmarkTable(result.benchmark, benchmarkContainer);
     } else if (benchmarkContainer) {
         benchmarkContainer.style.display = 'none';
     }
+    
+    if (!result.success) {
+        solutionDisplay.innerHTML = `
+            <div class="error-message" style="text-align: center; padding: 2rem; border-radius: 8px; background: #fff5f5; border: 1px solid #fed7d7;">
+                <h3 style="color: #c53030; margin-bottom: 0.5rem;">⚠️ No Valid Combination Found</h3>
+                <p style="color: #4a5568; margin-bottom: 0.5rem;"><strong>${escapeHtml(result.error || 'Could not find a valid combination within your constraints.')}</strong></p>
+                <p style="color: #718096; font-size: 0.9rem;">Recommendation: Try increasing your budget (current: ₹${result.budget || 0}) or lowering your minimum condition requirement (current: ${escapeHtml(result.minimumCondition || 'Any')}).</p>
+            </div>
+        `;
+        if (savePlanBtn) savePlanBtn.style.display = 'none';
+        if (viewStepsBtn) {
+            viewStepsBtn.style.display = (result.steps && result.steps.length > 0) ? 'inline-flex' : 'none';
+        }
+        return;
+    }
+    
+    if (savePlanBtn) savePlanBtn.style.display = 'inline-flex';
+    if (viewStepsBtn) viewStepsBtn.style.display = 'inline-flex';
     
     // Render Selected Solution
     let solutionHTML = '<div class="solution-items">';
@@ -199,8 +290,9 @@ function renderBenchmarkTable(benchmark, container) {
 // Display AI explanation
 function displayAIExplanation(result) {
     const aiExplanation = document.getElementById('aiExplanation');
+    if (!aiExplanation) return;
     
-    if (!result.success) {
+    if (!result.variables || !result.domains) {
         aiExplanation.style.display = 'none';
         return;
     }
@@ -212,7 +304,7 @@ function displayAIExplanation(result) {
     
     let domainsText = '';
     for (const [variable, resources] of Object.entries(result.domains)) {
-        domainsText += `${variable}: ${resources.length} item(s) | `;
+        domainsText += `${variable}: ${resources.length} valid item(s) | `;
     }
     document.getElementById('domainsExplanation').textContent = domainsText.replace(/\|\s*$/, '');
     
@@ -224,11 +316,19 @@ function displayAIExplanation(result) {
         <li><strong>Uniqueness Constraint:</strong> $Resource_i \\neq Resource_j$ (No duplicate purchases)</li>
     `;
     
-    document.getElementById('backtrackingExplanation').textContent = 
-        `${result.algorithmName} traversed ${result.nodesExplored} search node(s) with ${result.backtracks} backtrack(s) and pruned ${result.prunings || 0} dead-end domain value(s).`;
-    
-    document.getElementById('solutionExplanation').textContent = 
-        `Valid optimal combination found in ${result.executionTimeMs} ms with total cost ₹${result.totalCost} (Savings: ₹${result.remainingBudget}).`;
+    if (result.success) {
+        document.getElementById('backtrackingExplanation').textContent = 
+            `${result.algorithmName} traversed ${result.nodesExplored} search node(s) with ${result.backtracks} backtrack(s) and pruned ${result.prunings || 0} dead-end domain value(s).`;
+        
+        document.getElementById('solutionExplanation').textContent = 
+            `Valid optimal combination found in ${result.executionTimeMs} ms with total cost ₹${result.totalCost} (Savings: ₹${result.remainingBudget}).`;
+    } else {
+        document.getElementById('backtrackingExplanation').textContent = 
+            `Search space exhausted: The solver traversed ${result.nodesExplored || 0} node(s) and performed ${result.backtracks || 0} backtrack(s) with ${result.prunings || 0} domain pruning(s).`;
+        
+        document.getElementById('solutionExplanation').textContent = 
+            `No valid assignment satisfied all constraints simultaneously within budget ₹${result.budget} and condition ${result.minimumCondition}.`;
+    }
 }
 
 // Display algorithm steps

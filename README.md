@@ -89,123 +89,90 @@ campusshare/
 
 ### Prerequisites
 
-- A Supabase account (free tier works)
-- Basic knowledge of SQL
-- A web browser to run the application
+- A Google Firebase account (free Spark plan works)
+- A modern web browser
+- Python 3 or Node.js (for running a local HTTP server)
 
-### Step 1: Create Supabase Project
+### Step 1: Firebase Project Setup
 
-1. Go to [supabase.com](https://supabase.com)
-2. Sign up / Log in
-3. Click "New Project"
-4. Enter project details:
-   - Name: `campusshare`
-   - Database Password: (choose a strong password)
-   - Region: Choose nearest region
-5. Wait for project to be created (2-3 minutes)
+1. The repository comes pre-configured for Firebase project `foai-53b5b` in `js/firebase.js`.
+2. To use your own Firebase project:
+   - Go to the [Firebase Console](https://console.firebase.google.com).
+   - Click **Add Project** and name it (e.g., `campusshare`).
+   - Go to **Build** → **Authentication** → **Sign-in method**, enable **Email/Password**, and click Save.
+   - Go to **Build** → **Firestore Database**, click **Create Database** in **Native mode**, and choose your region (e.g., `asia-south2`).
+   - In **Project Settings** → **General** → **Your apps**, register a Web App (`</>`) and copy the config object into [`js/firebase.js`](file:///c:/Users/naveed%20sheriff%20j/Desktop/COLLEGE/PROJECTS/FOAI%20PROJECT/js/firebase.js).
 
-### Step 2: Configure Database
+### Step 2: Apply Cloud Firestore Security Rules
 
-1. Open your Supabase project
-2. Go to SQL Editor (left sidebar)
-3. Copy and execute the SQL from `SETUP_SQL.md`
-4. This will create:
-   - Tables: `profiles`, `resources`, `planner_history`, `planner_history_items`
-   - Row Level Security (RLS) policies
-   - Storage bucket: `resource-images`
+1. In the Firebase Console, navigate to **Firestore Database** → **Rules**.
+2. Paste the contents of [`firestore.rules`](file:///c:/Users/naveed%20sheriff%20j/Desktop/COLLEGE/PROJECTS/FOAI%20PROJECT/firestore.rules):
+   - Secure profiles so only registered students can read/create their profile.
+   - Restrict listings so only sellers can update/delete their own resources.
+   - Protect private buyer-seller chat messages and purchase requests.
+3. Click **Publish**.
 
-5. Copy and execute the SQL from `REQUESTS_CHAT_SQL.md`
-6. This will add:
-   - Tables: `purchase_requests`, `messages`
-   - Row Level Security (RLS) policies for requests and chat
-   - Supabase Realtime setup for real-time messaging
+### Step 3: Configure College Email Domain
 
-### Step 3: Configure Supabase Storage
-
-1. Go to Storage (left sidebar)
-2. Create a new bucket named `resource-images`
-3. Make it public (for image display)
-4. Configure bucket policies if needed
-
-### Step 4: Get Supabase Credentials
-
-1. Go to Project Settings → API
-2. Copy:
-   - Project URL
-   - anon public key
-
-### Step 5: Configure Application
-
-1. Open `js/supabase.js`
-2. Replace the placeholder values:
+Open [`js/firebase.js`](file:///c:/Users/naveed%20sheriff%20j/Desktop/COLLEGE/PROJECTS/FOAI%20PROJECT/js/firebase.js) and update the campus domain constraint:
 
 ```javascript
-const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';        // Paste your Project URL
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE'; // Paste your anon key
+const COLLEGE_EMAIL_DOMAIN = 'rajalakshmi.edu.in'; // Or your university domain (e.g., 'college.edu')
 ```
 
-3. Configure college email domain:
+### Step 4: Run the Application Locally
 
-```javascript
-const COLLEGE_EMAIL_DOMAIN = 'college.edu'; // Change to your college domain
+Start a local HTTP server from the project root directory:
+
+```bash
+# Using Python 3 (Recommended)
+python -m http.server 8000
+
+# Or using Node.js
+npx http-server -p 8000
 ```
 
-### Step 6: Add Sample Data (Optional)
+Open your browser and navigate to:
+```
+http://localhost:8000
+```
 
-1. Go to SQL Editor in Supabase
-2. Copy and execute the SQL from `SAMPLE_DATA.sql`
-3. This will add sample resources for testing
+## 👤 Creating an Account
 
-### Step 7: Run the Application
-
-1. Open `index.html` in a web browser
-2. Or use a local server:
-   ```bash
-   # Using Python 3
-   python -m http.server 8000
-   
-   # Using Node.js (if you have http-server installed)
-   npx http-server
-   ```
-3. Navigate to `http://localhost:8000`
-
-## 👤 Creating the First User
-
-1. Open the application in your browser
-2. Click "Register"
-3. Fill in the form:
+1. Open the application at `http://localhost:8000`.
+2. Click **Register**.
+3. Fill in your student information:
    - Full Name
-   - College Email (must match configured domain)
-   - Student ID
-   - Department
-   - Year
-   - Password
-4. Click "Create Account"
-5. Check your email for verification (if enabled)
-6. Login with your credentials
+   - College Email (must end with `@` + your configured domain)
+   - Student ID / Roll Number
+   - Department (e.g., Computer Science and Engineering)
+   - Year of Study (e.g., 3)
+   - Password (minimum 6 characters)
+4. Click **Create Account**.
+5. Once registered, you will be taken to your personalized dashboard!
 
-## 📚 Adding Sample Resources
+## 📚 Adding Resources & Sample Data
 
-### Method 1: Via SQL (Recommended for Testing)
+### Method 1: One-Click Academic Sample Data (Instant Seeding)
 
-Execute the SQL in `SAMPLE_DATA.sql` to add pre-configured sample resources.
+1. Navigate to the **Marketplace** (`marketplace.html`).
+2. If the database is empty, click the **⚡ Seed Sample Academic Data** button in the empty state card.
+   *(Alternatively, run `seedSampleResourcesToDatabase()` in the browser developer console).*
+3. This writes authentic sample academic items (DBMS Books, Java Books, Casio fx-991EX Calculators, Arduino Kits, Engineering Drawing Sets, Multimeters) directly into your live Firestore database collection.
 
-### Method 2: Via Application UI
+### Method 2: Create a Custom Listing via the UI
 
-1. Login to the application
-2. Go to Dashboard → "Add Resource"
-3. Fill in the listing details:
-   - Title
-   - Description
-   - Category
-   - Subject
-   - Listing Type (Sell/Rent/Exchange/Donate)
-   - Price
-   - Condition
-   - Availability
-   - Pickup Location
-   - Image (optional)
-4. Click "Create Listing"
+1. From the Dashboard, click **Add Resource** (or navigate to `create-listing.html`).
+2. Fill in the listing details:
+   - Resource Title & Detailed Description
+   - Category (Textbook, Calculator, Lab Equipment, Arduino, Drawing Tools, etc.)
+   - Subject & Department
+   - Listing Type (Sell, Rent, Exchange, Donate)
+   - Price (₹)
+   - Physical Condition (New, Like New, Good, Fair, Poor)
+   - Pickup Location (e.g., Library, Block A, ECE Lab)
+   - Resource Image (automatically compressed into an optimized format and stored directly in Firestore—no external storage bucket required)
+3. Click **Create Listing**.
 
 ## 🤖 Testing the CSP Planner
 
@@ -295,74 +262,104 @@ Step 13: Solution found!
 
 ## 🔒 Security Features
 
-- **Row Level Security (RLS)**: Users can only access their own data
-- **Email Domain Validation**: Only college email addresses allowed
-- **Authentication**: Supabase Auth with email verification
-- **No Service Role Keys**: Only anon key used in frontend
-- **Ownership Checks**: Users can only edit/delete their own listings
+- **Cloud Firestore Security Rules (`firestore.rules`)**: Granular server-side authorization ensuring students can only modify their own profiles, listings, and conversations.
+- **Institutional Email Domain Restriction**: Enforces that only students with authorized campus email addresses (e.g., `@rajalakshmi.edu.in`) can register.
+- **Client-Side XSS Sanitization**: All user-provided fields (titles, descriptions, chat messages, seller names) are sanitized through a global `escapeHtml` utility before rendering into the DOM.
+- **Direct Canvas Image Compression**: Images are compressed locally to lightweight Base64 strings, eliminating the complexity and open-bucket risks of external cloud storage buckets.
+- **Protected Participant Chat**: Real-time messaging is strictly restricted to the verified buyer and seller of an accepted request.
 
-## 📊 Database Schema
+## 📊 Database Schema (Cloud Firestore)
 
-### Tables
+CampusShare uses **Cloud Firestore** in Native mode. The document-based schema is structured across 5 primary collections:
 
-#### profiles
-- `id` (UUID, primary key)
-- `name` (text)
-- `email` (text)
-- `student_id` (text)
-- `department` (text)
-- `year` (integer)
-- `created_at` (timestamp)
+### 1. `profiles`
+Document ID: `userId` (Firebase Auth UID)
+- `id`: string (Firebase Auth UID)
+- `name`: string
+- `email`: string
+- `student_id`: string
+- `department`: string
+- `year`: number
+- `created_at`: timestamp
 
-#### resources
-- `id` (UUID, primary key)
-- `seller_id` (UUID, foreign key → profiles.id)
-- `title` (text)
-- `description` (text)
-- `category` (text)
-- `subject` (text)
-- `listing_type` (text)
-- `price` (numeric)
-- `condition` (text)
-- `availability` (text)
-- `pickup_location` (text)
-- `image_url` (text)
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
+### 2. `resources`
+Document ID: Auto-generated Firestore ID
+- `seller_id`: string (Firebase Auth UID)
+- `seller_name`: string
+- `seller_email`: string
+- `title`: string (e.g., "DBMS Book - Database System Concepts")
+- `description`: string
+- `category`: string (`Textbook`, `Calculator`, `Lab Equipment`, `Arduino`, `Drawing Tools`, etc.)
+- `subject`: string
+- `listing_type`: string (`Sell`, `Rent`, `Exchange`, `Donate`)
+- `price`: number (₹)
+- `condition`: string (`New`, `Like New`, `Good`, `Fair`, `Poor`)
+- `availability`: string (`Available`, `Reserved`, `Sold`)
+- `pickup_location`: string
+- `image_url`: string (Base64 data URL or external URL)
+- `created_at`: timestamp
+- `updated_at`: timestamp
 
-#### planner_history
-- `id` (UUID, primary key)
-- `user_id` (UUID, foreign key → profiles.id)
-- `budget` (numeric)
-- `minimum_condition` (text)
-- `total_cost` (numeric)
-- `remaining_budget` (numeric)
-- `created_at` (timestamp)
+### 3. `purchase_requests`
+Document ID: Auto-generated Firestore ID
+- `resource_id`: string (Foreign reference to `resources`)
+- `resource_title`: string
+- `resource_image_url`: string
+- `resource_price`: number
+- `resource_listing_type`: string
+- `buyer_id`: string
+- `buyer_name`: string
+- `buyer_email`: string
+- `buyer_department`: string
+- `seller_id`: string
+- `seller_name`: string
+- `seller_email`: string
+- `message`: string
+- `pickup_location`: string
+- `status`: string (`PENDING`, `ACCEPTED`, `REJECTED`, `COMPLETED`)
+- `created_at`: timestamp
+- `updated_at`: timestamp
 
-#### planner_history_items
-- `id` (UUID, primary key)
-- `history_id` (UUID, foreign key → planner_history.id)
-- `resource_id` (UUID, foreign key → resources.id)
-- `resource_title` (text)
-- `price` (numeric)
-- `condition` (text)
+### 4. `messages` (Real-Time Chat)
+Document ID: Auto-generated Firestore ID
+- `request_id`: string (Foreign reference to `purchase_requests`)
+- `sender_id`: string (Firebase Auth UID)
+- `sender_name`: string
+- `message`: string
+- `created_at`: timestamp
+
+### 5. `planner_history`
+Document ID: Auto-generated Firestore ID
+- `user_id`: string (Firebase Auth UID)
+- `budget`: number
+- `minimum_condition`: string
+- `total_cost`: number
+- `remaining_budget`: number
+- `mode`: string (`mrv`, `fc`, `simple`)
+- `items`: array of objects `[{ resource_id, resource_title, price, condition, variable }]`
+- `created_at`: timestamp
 
 ## 🐛 Troubleshooting
 
-### Issue: "No resources found"
-- **Solution**: Add sample data via SQL or create listings through the UI
+### Issue: "0 Available Resources" in Marketplace / Dashboard
+- **Explanation**: The application connects directly to your live Firestore collection. If you have not created listings yet, it accurately displays `0`.
+- **Solution**: 
+  - Click **⚡ Seed Sample Academic Data** on the Marketplace page (`marketplace.html`) to populate sample textbooks, calculators, and kits.
+  - Or click **Add Resource** on the Dashboard to create your own listing!
 
-### Issue: "Email domain not allowed"
-- **Solution**: Update `COLLEGE_EMAIL_DOMAIN` in `js/supabase.js`
+### Issue: "Email domain not allowed" during registration
+- **Solution**: Check [`js/firebase.js`](file:///c:/Users/naveed%20sheriff%20j/Desktop/COLLEGE/PROJECTS/FOAI%20PROJECT/js/firebase.js) line 14:
+  ```javascript
+  const COLLEGE_EMAIL_DOMAIN = 'rajalakshmi.edu.in'; // Update to your college domain
+  ```
 
-### Issue: Images not uploading
-- **Solution**: Ensure `resource-images` bucket exists and is public in Supabase Storage
+### Issue: CSP planner returns "No valid combination found"
+- **Solution**: The CSP solver strictly enforces your budget and minimum condition constraints.
+  - Try increasing your budget (e.g., ₹1500 instead of ₹500).
+  - Or lower the minimum condition (e.g., select `Good` or `Fair`).
 
-### Issue: CSP planner returns no solution
-- **Solution**: Increase budget or lower minimum condition requirement
-
-### Issue: Authentication errors
-- **Solution**: Verify Supabase URL and anon key are correctly configured
+### Issue: Firebase "Missing or insufficient permissions"
+- **Solution**: Open the Firebase Console, go to **Firestore Database** → **Rules**, and ensure you have published the rules from [`firestore.rules`](file:///c:/Users/naveed%20sheriff%20j/Desktop/COLLEGE/PROJECTS/FOAI%20PROJECT/firestore.rules).
 
 ## 📝 Future Enhancements (Not Implemented)
 
@@ -380,23 +377,23 @@ These are future features mentioned in the requirements but NOT implemented in t
 
 ## 💬 Buyer-Seller Communication System
 
-The application now includes a complete buyer-seller communication system:
+The application includes a complete peer-to-peer transaction lifecycle:
 
 ### Features:
-- **Request Modal**: Buyers can send requests with custom messages and pickup locations
-- **Dynamic Button Labels**: "Request to Buy", "Request to Rent", "Request to Exchange", "Request to Donate"
-- **Seller Requests Page**: Sellers can view and manage requests for their listings
-- **My Requests Page**: Buyers can track their request status
-- **Real-time Chat**: Private messaging between buyer and seller after request acceptance
-- **Status Management**: PENDING → ACCEPTED → COMPLETED workflow
-- **Automatic Updates**: Resource availability changes based on request status
+- **Request Modal**: Buyers can send purchase/rent/exchange requests with proposed pickup location and custom messages.
+- **Dynamic Context Buttons**: "Request to Buy", "Request to Rent", "Request to Exchange", "Request to Donate" based on listing type.
+- **Seller Requests Page**: Sellers can review incoming requests and accept or decline.
+- **My Requests Page**: Buyers can track their submitted requests and status changes.
+- **Real-Time Chat**: Live peer-to-peer messaging via Firestore `onSnapshot` listeners once a request is accepted.
+- **Status Lifecycle**: `PENDING` → `ACCEPTED` → `COMPLETED` (or `REJECTED`).
+- **Resource State Transitions**: Automatically flags resources when a transaction is finalized.
 
 ### Security:
-- Row Level Security (RLS) on all request and message tables
-- Only participants can view their requests and messages
-- Users cannot request their own listings
-- Duplicate active requests are prevented
-- Chat is only available after request acceptance
+- Security rules enforced via [`firestore.rules`](file:///c:/Users/naveed%20sheriff%20j/Desktop/COLLEGE/PROJECTS/FOAI%20PROJECT/firestore.rules).
+- Only the specific buyer and seller can read or create messages for a request.
+- Users cannot submit requests on their own listings.
+- Duplicate pending requests for the same resource are blocked.
+- Chat room access is only unlocked after the request is officially accepted by the seller.
 
 ## 🎓 Academic Context
 
@@ -427,5 +424,5 @@ This project is created for educational purposes.
 
 ## 🙏 Acknowledgments
 
-- Supabase for the excellent backend-as-a-service platform
+- Firebase for the excellent backend-as-a-service platform
 - The AI algorithms are based on standard CSP and backtracking search techniques from AI textbooks
